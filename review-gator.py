@@ -4,6 +4,7 @@
 import datetime
 import github
 import os
+import pytz
 import sys
 import yaml
 from collections import namedtuple
@@ -11,6 +12,10 @@ from collections import namedtuple
 import launchpadagent
 
 REPO_SPAN = 5
+NOW = pytz.utc.localize(datetime.datetime.utcnow())
+ONE_DAY = datetime.timedelta(days=1)
+ONE_HOUR = datetime.timedelta(hours=1)
+
 
 class Repo(object):
     '''Base class for a source code repository.
@@ -67,9 +72,14 @@ class PullRequest(object):
         self.reviews = []
 
     def __repr__(self):
-        return 'PullRequest[{}, {}, {}, {}, {}]'.format(
+        return u'PullRequest[{}, {}, {}, {}, {}]'.format(
             self.pull_request_type, self.title, self.owner, self.state,
             self.date)
+
+    @property
+    def age(self):
+        print(u'{}'.format(self))
+        return date_to_age(self.date)
 
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
@@ -83,7 +93,7 @@ class PullRequest(object):
         '''Return a table row for each PullRequest.'''
         title = '<a href="{}">{}</a>'.format(
             self.url, self.title)
-        fields = [title, self.owner, self.state, self.date]
+        fields = [title, self.owner, self.state, self.age]
         text = u'<table>\n  {}\n</table>\n'
         inner = u'<tr>\n'
         inner += u'\n'.join([u'    <td>{}</td>'.format(field)
@@ -102,6 +112,7 @@ class PullRequest(object):
 class GithubPullRequest(PullRequest):
     '''A github pull request.'''
     def __init__(self, handle, url, title, owner, state, date, review_count):
+        date = pytz.utc.localize(date)
         super(GithubPullRequest, self).__init__(
             'github', handle, url, title, owner, state, date, review_count)
 
@@ -124,8 +135,13 @@ class Review(object):
         self.date = date
 
     def __repr__(self):
-        return 'Review[{}, {}, {}, {}, {}]'.format(self.review_type,
+        return u'Review[{}, {}, {}, {}, {}]'.format(self.review_type,
             self.review, self.owner, self.state, self.date)
+
+    @property
+    def age(self):
+        print(u'{}'.format(self))
+        return date_to_age(self.date)
 
     def html(self):
         '''Represent the review as an html table.'''
@@ -133,13 +149,14 @@ class Review(object):
         state = u'<a href="{}">{}</a>'.format(self.url, self.state)
         text = u'<table>\n  <tr>{}  </tr>\n</table>\n'
         inner = u'\n'.join([u'    <td>{}</td>'.format(field)
-                           for field in [self.owner, state, self.date]])
+                           for field in [self.owner, state, self.age]])
         return text.format(inner)
 
 
 class GithubReview(Review):
     '''A github pull request review.'''
     def __init__(self, handle, url, owner, state, date):
+        date = pytz.utc.localize(date)
         super(GithubReview, self).__init__(
             'github', handle, url, owner, state, date)
 
@@ -150,6 +167,17 @@ class LaunchpadReview(Review):
         super(LaunchpadReview, self).__init__(
             'launchpad', handle, url, owner, state, date)
 
+def date_to_age(date):
+    if date is None:
+        return None
+    print('NOW: {}'.format(NOW))
+    print('date: {}'.format(date))
+    age = NOW - date
+    if age > ONE_DAY:
+        return '{} days'.format(age.days)
+    if age > ONE_HOUR:
+        return '{} hours'.format(age.minutes / 60)
+    return '{} minutes'.format(age.minutes)
 
 def get_all_repos(gh, sources):
     '''Return all repos, prs and reviews for the given github sources.'''
@@ -235,10 +263,7 @@ def get_branches_for_owner(lp, collected, owner, max_age):
 
     This is used to identify any recently submitted prs that escaped the
     whitelist of launchpad repositories. This only applies to launchpad.'''
-    # XXX: Use the age provided by the source file
-    #age_gate = datetime.datetime.strptime('Feb 1 2017  12:01AM', '%b %d %Y %I:%M%p')
-    age_gate = datetime.datetime.now() - datetime.timedelta(days=max_age)
-    print('age_gate: {}'.format(age_gate))
+    age_gate = NOW - datetime.timedelta(days=max_age)
     owner = owner.decode('utf-8')
     team = lp.people(owner)
     branches = team.getBranches(modified_since=age_gate)
@@ -246,12 +271,10 @@ def get_branches_for_owner(lp, collected, owner, max_age):
     for b in branches:
         # XXX: Add logic to skip branches we already have
         if b.display_name in collected:
-            print('Skipping, already have {}'.format(b.display_name))
             continue
         branch = LaunchpadRepo(b, b.owner, b.display_name)
         get_mps(branch, b)
         if branch.pull_request_count > 0:
-            print('Skipping, no mps {}'.format(b.display_name))
             repos.append(branch)
     return repos
 
