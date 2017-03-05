@@ -29,6 +29,10 @@ class Repo(object):
         return 'Repo[{}, {}, {}, {}]'.format(
             self.repo_type, self.name, self.url, self.pull_requests)
 
+    @property
+    def pull_request_count(self):
+        return len(self.pull_requests)
+
     def add(self, pull_request):
         '''Add a pull request to this repository.'''
         self.pull_requests.append(pull_request)
@@ -226,22 +230,29 @@ def get_mps(repo, branch):
             pr.add_review(review)
 
 
-def get_branches_for_owner(lp, owner):
+def get_branches_for_owner(lp, collected, owner, max_age):
     '''Return all repos and prs for the given owner with the age limit.
 
     This is used to identify any recently submitted prs that escaped the
     whitelist of launchpad repositories. This only applies to launchpad.'''
     # XXX: Use the age provided by the source file
-    age_gate = datetime.datetime.strptime('Feb 1 2017  12:01AM', '%b %d %Y %I:%M%p')
+    #age_gate = datetime.datetime.strptime('Feb 1 2017  12:01AM', '%b %d %Y %I:%M%p')
+    age_gate = datetime.datetime.now() - datetime.timedelta(days=max_age)
+    print('age_gate: {}'.format(age_gate))
     owner = owner.decode('utf-8')
     team = lp.people(owner)
     branches = team.getBranches(modified_since=age_gate)
     repos = []
     for b in branches:
         # XXX: Add logic to skip branches we already have
+        if b.display_name in collected:
+            print('Skipping, already have {}'.format(b.display_name))
+            continue
         branch = LaunchpadRepo(b, b.owner, b.display_name)
         get_mps(branch, b)
-        repos.append(branch)
+        if branch.pull_request_count > 0:
+            print('Skipping, no mps {}'.format(b.display_name))
+            repos.append(branch)
     return repos
 
 
@@ -257,6 +268,12 @@ def get_branches(sources):
         get_mps(repo, b)
         repos.append(repo)
         print(repo)
+    collected = [r.name for r in repos]
+    print('collected: {}'.format(collected))
+    for owner, data in sources['owners'].iteritems():
+        print(owner, data)
+        repos.extend(get_branches_for_owner(
+            lp, collected, owner, data['max-age']))
     return repos
 
 
