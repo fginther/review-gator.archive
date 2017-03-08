@@ -188,7 +188,8 @@ def get_all_repos(gh, sources):
             review_count = sources[org][name]['review-count']
             gr = GithubRepo(repo, repo.html_url, repo.ssh_url)
             get_prs(gr, repo, review_count)
-            repos.append(gr)
+            if gr.pull_request_count > 0:
+                repos.append(gr)
             print(gr)
     return repos
 
@@ -289,7 +290,8 @@ def get_branches(sources):
         b = lp.branches.getByUrl(url=source)
         repo = LaunchpadRepo(b, b.owner, b.display_name)
         get_mps(repo, b)
-        repos.append(repo)
+        if repo.pull_request_count > 0:
+            repos.append(repo)
         print(repo)
     collected = [r.name for r in repos]
     print('collected: {}'.format(collected))
