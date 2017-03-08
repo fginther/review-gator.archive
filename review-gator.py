@@ -78,7 +78,7 @@ class PullRequest(object):
 
     @property
     def age(self):
-        print(u'{}'.format(self))
+        #print(u'{}'.format(self))
         return date_to_age(self.date)
 
     def add_review(self, review):
@@ -140,7 +140,7 @@ class Review(object):
 
     @property
     def age(self):
-        print(u'{}'.format(self))
+        #print(u'{}'.format(self))
         return date_to_age(self.date)
 
     def html(self):
@@ -176,8 +176,8 @@ def date_to_age(date):
     if age > ONE_DAY:
         return '{} days'.format(age.days)
     if age > ONE_HOUR:
-        return '{} hours'.format(age.minutes / 60)
-    return '{} minutes'.format(age.minutes)
+        return '{} hours'.format(age.seconds / 3600)
+    return '{} minutes'.format(age.seconds / 60)
 
 def get_all_repos(gh, sources):
     '''Return all repos, prs and reviews for the given github sources.'''
