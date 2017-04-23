@@ -30,6 +30,9 @@ th, td {
     border-bottom: 1px solid #ddd;
     font-family: "Ubuntu", Verdana, Serif;
 }
+a:link {
+    text-decoration: none;
+}
 </style>
 </head>
 '''
@@ -111,7 +114,7 @@ class PullRequest(object):
         '''Return a table row for each PullRequest.'''
         title = '<a href="{}">{}</a>'.format(
             self.url, self.title)
-        fields = [title.replace('\n', '<br>'), self.owner, self.state, self.age]
+        fields = [title.replace('\n', '<br>'), self.state, self.owner, self.age]
         text = u'<table>\n  {}\n</table>\n'
         if index % 2 == 1:
             inner = u'<tr bgcolor="#f2f2f2">'
@@ -275,10 +278,27 @@ def get_mp_title(mp):
     title = ''
     git_source = mp.source_git_path
     if git_source is not None:
-        title += git_source.replace('refs/heads/', '') + ' => '
+        source = '<strong>'
+        source += mp.source_git_repository_link.replace(
+            'https://api.launchpad.net/devel/', '')
+        source += ':' + git_source.replace('refs/heads/', '') + '</strong> &rArr; '
+        title += source
+    else:
+        source = '<strong>'
+        source += mp.source_branch_link.replace(
+            'https://api.launchpad.net/devel/', '')
+        source += '</strong> &rArr; '
+        title += source
     git_target = mp.target_git_path
     if git_target is not None:
-        title += git_target.replace('refs/heads/', '')
+        target = mp.target_git_repository_link.replace(
+            'https://api.launchpad.net/devel/', '')
+        target += ':' + git_target.replace('refs/heads/', '')
+        title += target
+    else:
+        target = mp.source_branch_link.replace(
+            'https://api.launchpad.net/devel/', '')
+        title += target
 
     description = mp.description
     if description is not None:
