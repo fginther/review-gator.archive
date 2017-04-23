@@ -11,6 +11,7 @@ from collections import namedtuple
 
 import launchpadagent
 
+MAX_DESCRIPTION_LENGTH = 80
 REPO_SPAN = 5
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
 ONE_DAY = datetime.timedelta(days=1)
@@ -93,7 +94,7 @@ class PullRequest(object):
         '''Return a table row for each PullRequest.'''
         title = '<a href="{}">{}</a>'.format(
             self.url, self.title)
-        fields = [title, self.owner, self.state, self.age]
+        fields = [title.replace('\n', '<br>'), self.owner, self.state, self.age]
         text = u'<table>\n  {}\n</table>\n'
         inner = u'<tr>\n'
         inner += u'\n'.join([u'    <td>{}</td>'.format(field)
@@ -230,6 +231,7 @@ def render_repo_table(repos):
     text += '</table>'
     return text
 
+
 def render(repos):
     '''Render the repositories into an html file.'''
     data = render_repo_table(repos)
@@ -239,12 +241,42 @@ def render(repos):
         out_file.write(text.encode('utf-8'))
 
 
+def get_mp_title(mp):
+    '''Format a sensible MP title from git branches and the description.'''
+    title = ''
+    git_source = mp.source_git_path
+    if git_source is not None:
+        title += git_source.replace('refs/heads/', '') + ' into '
+    git_target = mp.target_git_path
+    if git_target is not None:
+        title += git_target.replace('refs/heads/', '')
+
+    description = mp.description
+    if description is not None:
+        description = description.split('\n')[0]
+        if len(description) > MAX_DESCRIPTION_LENGTH:
+            description = description[:MAX_DESCRIPTION_LENGTH] + '...'
+        if len(title) > 0:
+            title += '\n'
+        title += description
+    return title
+
+
+def get_candidate_mps(branch):
+    try:
+        mps = branch.getMergeProposals(status='Needs review')
+    except AttributeError:
+        mps = branch.landing_candidates
+    return mps
+
+
 def get_mps(repo, branch):
     '''Return all merge proposals for the given branch.'''
-    mps = branch.getMergeProposals(status='Needs review')
+    mps = get_candidate_mps(branch)
     for mp in mps:
         _, owner = mp.registrant_link.split('~')
-        title = mp.description.split('\n')[0]
+        title = get_mp_title(mp)
+
         pr = LaunchpadPullRequest(mp, mp.web_link, title, owner,
                                   mp.queue_status,
                                   mp.date_created, 2)
@@ -288,7 +320,7 @@ def get_branches(sources):
     for source, data in sources['branches'].iteritems():
         print(source, data)
         b = lp.branches.getByUrl(url=source)
-        repo = LaunchpadRepo(b, b.owner, b.display_name)
+        repo = LaunchpadRepo(b, b.web_link, b.display_name)
         get_mps(repo, b)
         if repo.pull_request_count > 0:
             repos.append(repo)
@@ -299,6 +331,22 @@ def get_branches(sources):
         print(owner, data)
         repos.extend(get_branches_for_owner(
             lp, collected, owner, data['max-age']))
+    return repos
+
+
+def get_lp_repos(sources):
+    '''Return all repos, prs and reviews for the given lp-git source.'''
+    launchpad_cachedir = os.path.join('/tmp/get_reviews/.launchpadlib')
+    lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
+    repos = []
+    for source, data in sources['repos'].iteritems():
+        print(source, data)
+        b = lp.git_repositories.getByPath(path=source.replace('lp:', ''))
+        repo = LaunchpadRepo(b, b.web_link, b.display_name)
+        get_mps(repo, b)
+        if repo.pull_request_count > 0:
+            repos.append(repo)
+        print(repo)
     return repos
 
 
@@ -321,8 +369,13 @@ def main():
     '''Start here.'''
     # XXX: Use argparse instead of raw sys.argv
     sources = get_source_info(sys.argv[1])
-    repos = get_branches(sources['launchpad'])
-    repos.extend(get_repos(sources['github']))
+    repos = []
+    if 'lp-git' in sources:
+        repos.extend(get_lp_repos(sources['lp-git']))
+    if 'launchpad' in sources:
+        repos.extend(get_branches(sources['launchpad']))
+    if 'github' in sources:
+        repos.extend(get_repos(sources['github']))
     render(repos)
 
 
