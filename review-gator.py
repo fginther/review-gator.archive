@@ -402,8 +402,8 @@ def main():
     # XXX: Use argparse instead of raw sys.argv
     sources = get_source_info(sys.argv[1])
     repos = []
-    #if 'lp-git' in sources:
-    #    repos.extend(get_lp_repos(sources['lp-git']))
+    if 'lp-git' in sources:
+        repos.extend(get_lp_repos(sources['lp-git']))
     if 'launchpad' in sources:
         repos.extend(get_branches(sources['launchpad']))
     if 'github' in sources:
