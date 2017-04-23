@@ -16,6 +16,23 @@ REPO_SPAN = 5
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
 ONE_DAY = datetime.timedelta(days=1)
 ONE_HOUR = datetime.timedelta(hours=1)
+HTML_HEAD = '''
+<head>
+<style>
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th, td {
+    padding: 4px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-family: "Ubuntu", Verdana, Serif;
+}
+</style>
+</head>
+'''
 
 
 class Repo(object):
@@ -90,22 +107,25 @@ class PullRequest(object):
                 break
         self.reviews.append(review)
 
-    def html(self):
+    def html(self, index):
         '''Return a table row for each PullRequest.'''
         title = '<a href="{}">{}</a>'.format(
             self.url, self.title)
         fields = [title.replace('\n', '<br>'), self.owner, self.state, self.age]
         text = u'<table>\n  {}\n</table>\n'
-        inner = u'<tr>\n'
+        if index % 2 == 1:
+            inner = u'<tr bgcolor="#f2f2f2">'
+        else:
+            inner = u'<tr>\n'
         inner += u'\n'.join([u'    <td>{}</td>'.format(field)
                            for field in fields])
         reviews = [r.html() for r in self.reviews]
         for count in range(len(reviews), self.review_count):
-            reviews.append(u'      <table><tr><td>EMPTY</td></tr></table>\n')
-        review_list = [u'<tr><td>{}</td></tr>\n'.format(r) for r in reviews]
+            reviews.append(u'      <tr><td colspan=3>EMPTY</td></tr>\n')
+        review_list = [u'{}\n'.format(r) for r in reviews]
         table = u'\n'.join([u'    {}'.format(r)
                    for r in review_list])
-        inner += u'\n    <td><table border=1>\n  <tr>{}\n </tr>\n</table></td>\n'.format(table)
+        inner += u'\n    <td><table>\n{}\n</table></td>\n'.format(table)
         inner += u'</tr>'
         return inner
 
@@ -145,11 +165,11 @@ class Review(object):
         return date_to_age(self.date)
 
     def html(self):
-        '''Represent the review as an html table.'''
+        '''Represent the review as the contents of a table row.'''
         # XXX: Might be better to return a table row instead
         state = u'<a href="{}">{}</a>'.format(self.url, self.state)
-        text = u'<table>\n  <tr>{}  </tr>\n</table>\n'
-        inner = u'\n'.join([u'    <td>{}</td>'.format(field)
+        text = u'  <tr>\n{}\n  </tr>\n'
+        inner = u'\n'.join([u'    <td class="inner">{}</td>'.format(field)
                            for field in [self.owner, state, self.age]])
         return text.format(inner)
 
@@ -171,8 +191,9 @@ class LaunchpadReview(Review):
 def date_to_age(date):
     if date is None:
         return None
-    print('NOW: {}'.format(NOW))
-    print('date: {}'.format(date))
+    if date == '':
+        return None
+
     age = NOW - date
     if age > ONE_DAY:
         return '{} days'.format(age.days)
@@ -218,15 +239,23 @@ def get_prs(gr, repo, review_count):
 
 def get_pr_table(pull_requests):
     '''Render the list of provided pull_requests.'''
-    return '\n'.join([p.html() for p in pull_requests])
+    # Set an index for each row to allow alternating background color
+    index = 1
+    text = ''
+    for p in pull_requests:
+        text = '{}\n{}'.format(text, p.html(index))
+        index += 1
+
+    return text
 
 
 def render_repo_table(repos):
     '''Render the list of repos, their prs and reviews into an html table.'''
     text = '<table border=1 cellpadding=4>'
     for repo in repos:
-        text += '  <tr><td colspan={}><b><a href="{}">{}</a></b></td></tr>'.format(
-            REPO_SPAN, repo.url, repo.name)
+        text += ('  <tr height=30><td colspan={}><b>'
+                 '<a href="{}"><br>{}</a></b></td></tr>'.format(
+                     REPO_SPAN, repo.url, repo.name))
         text += get_pr_table(repo.pull_requests)
     text += '</table>'
     return text
@@ -237,7 +266,7 @@ def render(repos):
     data = render_repo_table(repos)
     # XXX: Make the output configurable
     with open('reviews.html', 'w') as out_file:
-        text = u'<head>\n</head>\n<body>\n{}\n</body>\n'.format(data)
+        text = u'{}<body>\n{}\n</body>\n'.format(HTML_HEAD, data)
         out_file.write(text.encode('utf-8'))
 
 
@@ -246,7 +275,7 @@ def get_mp_title(mp):
     title = ''
     git_source = mp.source_git_path
     if git_source is not None:
-        title += git_source.replace('refs/heads/', '') + ' into '
+        title += git_source.replace('refs/heads/', '') + ' => '
     git_target = mp.target_git_path
     if git_target is not None:
         title += git_target.replace('refs/heads/', '')
@@ -285,9 +314,12 @@ def get_mps(repo, branch):
             owner = vote.reviewer.display_name
             comment = vote.comment
             result = 'EMPTY'
+            review_date = ''
             if comment is not None:
                 result = vote.comment.vote
-            review = LaunchpadReview(vote, vote.web_link, owner, result, None)
+                review_date = vote.date_created
+            review = LaunchpadReview(vote, vote.web_link, owner, result,
+                                     review_date)
             pr.add_review(review)
 
 
@@ -305,7 +337,7 @@ def get_branches_for_owner(lp, collected, owner, max_age):
         # XXX: Add logic to skip branches we already have
         if b.display_name in collected:
             continue
-        branch = LaunchpadRepo(b, b.owner, b.display_name)
+        branch = LaunchpadRepo(b, b.web_link, b.display_name)
         get_mps(branch, b)
         if branch.pull_request_count > 0:
             repos.append(branch)
@@ -370,8 +402,8 @@ def main():
     # XXX: Use argparse instead of raw sys.argv
     sources = get_source_info(sys.argv[1])
     repos = []
-    if 'lp-git' in sources:
-        repos.extend(get_lp_repos(sources['lp-git']))
+    #if 'lp-git' in sources:
+    #    repos.extend(get_lp_repos(sources['lp-git']))
     if 'launchpad' in sources:
         repos.extend(get_branches(sources['launchpad']))
     if 'github' in sources:
