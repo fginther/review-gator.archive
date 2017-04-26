@@ -1,0 +1,5 @@
+Jinja2==2.9.6
+pytz==2017.2
+PyYAML==3.12
+git+https://github.com/fginther/PyGithub.git@add-reviews#egg=PyGithub
+git+https://github.com/mpdavis/python-jose.git#egg=python-jose

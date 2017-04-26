@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from launchpadlib.credentials import RequestTokenAuthorizationEngine
@@ -39,7 +40,7 @@ class AuthorizeRequestTokenWithConsole(RequestTokenAuthorizationEngine):
                 credentials.exchange_request_token_for_access_token(
                     self.web_root)
                 break
-            except HTTPError, e:
+            except HTTPError as e:
                 if e.response.status == 403:
                     # The user decided not to authorize this
                     # application.
@@ -57,7 +58,7 @@ def get_launchpad(launchpadlib_dir=None):
     specified used that directory to store launchpadlib cache instead of
     the default """
     store = UnencryptedFileCredentialStore(
-        '/home/fginther/.launchpad.credentials')
+            os.path.join(os.path.expanduser('~'), '.launchpad.credentials'))
     lp_app = 'landscape-review-aggregator'
     lp_env = 'production'
     lp_version = 'devel'

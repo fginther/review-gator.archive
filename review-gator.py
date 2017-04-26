@@ -1,41 +1,19 @@
 #!/usr/bin/env python
 
-#from __future__ import unicode_literals
 import datetime
 import github
 import os
 import pytz
 import sys
 import yaml
-from collections import namedtuple
 
+from jinja2 import Environment, FileSystemLoader
 import launchpadagent
 
 MAX_DESCRIPTION_LENGTH = 80
-REPO_SPAN = 5
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
 ONE_DAY = datetime.timedelta(days=1)
 ONE_HOUR = datetime.timedelta(hours=1)
-HTML_HEAD = '''
-<head>
-<style>
-table {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-th, td {
-    padding: 4px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-    font-family: "Ubuntu", Verdana, Serif;
-}
-a:link {
-    text-decoration: none;
-}
-</style>
-</head>
-'''
 
 
 class Repo(object):
@@ -105,32 +83,11 @@ class PullRequest(object):
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
         for r in self.reviews:
-            if (review.owner == r.owner and review.date > r.date):
+            if (review.owner == r['owner'] and review.date > r['date']):
                 self.reviews.remove(r)
                 break
-        self.reviews.append(review)
-
-    def html(self, index):
-        '''Return a table row for each PullRequest.'''
-        title = '<a href="{}">{}</a>'.format(
-            self.url, self.title)
-        fields = [title.replace('\n', '<br>'), self.state, self.owner, self.age]
-        text = u'<table>\n  {}\n</table>\n'
-        if index % 2 == 1:
-            inner = u'<tr bgcolor="#f2f2f2">'
-        else:
-            inner = u'<tr>\n'
-        inner += u'\n'.join([u'    <td>{}</td>'.format(field)
-                           for field in fields])
-        reviews = [r.html() for r in self.reviews]
-        for count in range(len(reviews), self.review_count):
-            reviews.append(u'      <tr><td colspan=3>EMPTY</td></tr>\n')
-        review_list = [u'{}\n'.format(r) for r in reviews]
-        table = u'\n'.join([u'    {}'.format(r)
-                   for r in review_list])
-        inner += u'\n    <td><table>\n{}\n</table></td>\n'.format(table)
-        inner += u'</tr>'
-        return inner
+        self.reviews.append(merge_two_dicts(review.__dict__,
+                                            {'age': review.age}))
 
 
 class GithubPullRequest(PullRequest):
@@ -167,15 +124,6 @@ class Review(object):
         #print(u'{}'.format(self))
         return date_to_age(self.date)
 
-    def html(self):
-        '''Represent the review as the contents of a table row.'''
-        # XXX: Might be better to return a table row instead
-        state = u'<a href="{}">{}</a>'.format(self.url, self.state)
-        text = u'  <tr>\n{}\n  </tr>\n'
-        inner = u'\n'.join([u'    <td class="inner">{}</td>'.format(field)
-                           for field in [self.owner, state, self.age]])
-        return text.format(inner)
-
 
 class GithubReview(Review):
     '''A github pull request review.'''
@@ -191,6 +139,7 @@ class LaunchpadReview(Review):
         super(LaunchpadReview, self).__init__(
             'launchpad', handle, url, owner, state, date)
 
+
 def date_to_age(date):
     if date is None:
         return None
@@ -203,6 +152,14 @@ def date_to_age(date):
     if age > ONE_HOUR:
         return '{} hours'.format(age.seconds / 3600)
     return '{} minutes'.format(age.seconds / 60)
+
+
+def merge_two_dicts(x, y):
+    """Given two dicts, merge them into a new dict as a shallow copy."""
+    z = x.copy()
+    z.update(y)
+    return z
+
 
 def get_all_repos(gh, sources):
     '''Return all repos, prs and reviews for the given github sources.'''
@@ -240,37 +197,34 @@ def get_prs(gr, repo, review_count):
     return pull_requests
 
 
-def get_pr_table(pull_requests):
+def get_pr_data(pull_requests):
     '''Render the list of provided pull_requests.'''
-    # Set an index for each row to allow alternating background color
-    index = 1
-    text = ''
+    pr_data = []
     for p in pull_requests:
-        text = '{}\n{}'.format(text, p.html(index))
-        index += 1
-
-    return text
+        pr_data.append(merge_two_dicts(p.__dict__, {'age': p.age}))
+    return pr_data
 
 
-def render_repo_table(repos):
+def get_repo_data(repos):
     '''Render the list of repos, their prs and reviews into an html table.'''
-    text = '<table border=1 cellpadding=4>'
+    repo_data = {}
     for repo in repos:
-        text += ('  <tr height=30><td colspan={}><b>'
-                 '<a href="{}"><br>{}</a></b></td></tr>'.format(
-                     REPO_SPAN, repo.url, repo.name))
-        text += get_pr_table(repo.pull_requests)
-    text += '</table>'
-    return text
+        repo_data[repo.name] = {
+            'repo_url': repo.url,
+            'repo_name': repo.name,
+            'repo_shortname': repo.name.split('/')[-1],
+            'pull_requests': get_pr_data(repo.pull_requests)
+        }
+    return repo_data
 
 
 def render(repos):
     '''Render the repositories into an html file.'''
-    data = render_repo_table(repos)
-    # XXX: Make the output configurable
-    with open('reviews.html', 'w') as out_file:
-        text = u'{}<body>\n{}\n</body>\n'.format(HTML_HEAD, data)
-        out_file.write(text.encode('utf-8'))
+    data = get_repo_data(repos)
+    env = Environment(loader=FileSystemLoader('templates'))
+    tmpl = env.get_template('reviews.html')
+    with open('dist/reviews.html', 'w') as out_file:
+        out_file.write(tmpl.render({'repos': data}).encode('utf-8'))
 
 
 def get_mp_title(mp):

@@ -1,2 +1,7 @@
 *.pyc
 *.html
+/.idea/
+/branches_simple.yaml
+/branches.yaml
+!/templates/reviews.html
+/dist/reviews.html
