@@ -59,13 +59,14 @@ class PullRequest(object):
 
     Represents a github pull request or launchpad merge proposal.'''
     def __init__(self, pull_request_type, handle, url, title, owner, state,
-                 date, review_count):
+                 date, review_count, latest_activity=None):
         self.pull_request_type = pull_request_type
         self.handle = handle
         self.url = url
         self.title = title
         self.owner = owner
         self.state = state
+        self.latest_activity = latest_activity
         self.date = date
         self.review_count = review_count
         self.reviews = []
@@ -80,6 +81,11 @@ class PullRequest(object):
         #print(u'{}'.format(self))
         return date_to_age(self.date)
 
+    @property
+    def latest_activity_age(self):
+        # print(u'{}'.format(self))
+        return date_to_age(self.latest_activity)
+
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
         for r in self.reviews:
@@ -87,22 +93,26 @@ class PullRequest(object):
                 self.reviews.remove(r)
                 break
         self.reviews.append(merge_two_dicts(review.__dict__,
-                                            {'age': review.age}))
+                                            {'age': review.age }))
 
 
 class GithubPullRequest(PullRequest):
     '''A github pull request.'''
-    def __init__(self, handle, url, title, owner, state, date, review_count):
+    def __init__(self, handle, url, title, owner, state, date, review_count,
+                 latest_activity=None):
         date = pytz.utc.localize(date)
         super(GithubPullRequest, self).__init__(
-            'github', handle, url, title, owner, state, date, review_count)
+            'github', handle, url, title, owner, state, date, review_count,
+                latest_activity=latest_activity)
 
 
 class LaunchpadPullRequest(PullRequest):
     '''A launchpad pull request (aka merte proposal).'''
-    def __init__(self, handle, url, title, owner, state, date, review_count):
+    def __init__(self, handle, url, title, owner, state, date, review_count,
+                 latest_activity=None):
         super(LaunchpadPullRequest, self).__init__(
-            'launchpad', handle, url, title, owner, state, date, review_count)
+            'launchpad', handle, url, title, owner, state, date, review_count,
+                latest_activity=latest_activity)
 
 
 class Review(object):
@@ -166,7 +176,7 @@ def get_all_repos(gh, sources):
     repos = []
     for org in sources:
         for name, data in sources[org].iteritems():
-            repo = gh.get_repo('{}/{}'.format(org.replace(' ', '') , name))
+            repo = gh.get_repo('{}/{}'.format(org.replace(' ', ''), name))
             review_count = sources[org][name]['review-count']
             gr = GithubRepo(repo, repo.html_url, repo.ssh_url)
             get_prs(gr, repo, review_count)
@@ -188,12 +198,18 @@ def get_prs(gr, repo, review_count):
         pull_requests.append(pr)
         raw_reviews = p.get_reviews()
         index = 0
+        pr_latest_activity = None
         for raw_review in raw_reviews:
             index += 1
             owner = raw_review.user.login
             review = GithubReview(raw_review, raw_review.html_url, owner,
                                raw_review.state, raw_review.submitted_at)
             pr.add_review(review)
+            if pr_latest_activity is None or \
+                            raw_review.submitted_at > pr_latest_activity:
+                pr_latest_activity = raw_review.submitted_at.replace(
+                        tzinfo=pytz.UTC)
+        pr.latest_activity = pr_latest_activity
     return pull_requests
 
 
@@ -201,7 +217,9 @@ def get_pr_data(pull_requests):
     '''Render the list of provided pull_requests.'''
     pr_data = []
     for p in pull_requests:
-        pr_data.append(merge_two_dicts(p.__dict__, {'age': p.age}))
+        pr_data.append(merge_two_dicts(p.__dict__, {
+            'age': p.age,
+            'latest_activity_age': p.latest_activity_age}))
     return pr_data
 
 
@@ -284,17 +302,24 @@ def get_mps(repo, branch):
                                   mp.queue_status,
                                   mp.date_created, 2)
         repo.add(pr)
+        pr_latest_activity = None
         for vote in mp.votes:
             owner = vote.reviewer.display_name
             comment = vote.comment
             result = 'EMPTY'
-            review_date = ''
+            review_date = vote.date_created
             if comment is not None:
-                result = vote.comment.vote
-                review_date = vote.date_created
+                result = comment.vote
+                review_date = comment.date_created
             review = LaunchpadReview(vote, vote.web_link, owner, result,
                                      review_date)
+            if pr_latest_activity is None or review_date > pr_latest_activity:
+                pr_latest_activity = review_date
             pr.add_review(review)
+        pr.latest_activity = pr_latest_activity
+
+
+
 
 
 def get_branches_for_owner(lp, collected, owner, max_age):
@@ -358,8 +383,11 @@ def get_lp_repos(sources):
 
 def get_repos(sources):
     # XXX: Generate a warning if no user and password are found
-    gh = github.Github(os.environ.get('GITHUB_USER'),
-                       os.environ.get('GITHUB_PASSWORD'))
+    if os.environ.get('GITHUB_TOKEN'):
+        gh = github.Github(os.environ.get('GITHUB_TOKEN'))
+    else:
+        gh = github.Github(os.environ.get('GITHUB_USER'),
+                           os.environ.get('GITHUB_PASSWORD'))
     repos = get_all_repos(gh, sources['repos'])
     return repos
 

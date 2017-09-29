@@ -34,6 +34,7 @@
                 <th>Merge Proposal</th>
                 <th>State</th>
                 <th>Owner</th>
+                <th>Latest Activity</th>
                 <th>Age</th>
                 <th>Reviews</th>
             </tr>
@@ -46,12 +47,13 @@
                     <td><a href="{{ pull_request.url }}">{{ pull_request.title }}</a></td>
                     <td>{{ pull_request.state }}</td>
                     <td>{{ pull_request.owner }}</td>
+                    <td data-order="{{ pull_request.latest_activity }}">{{ pull_request.latest_activity_age }}</td>
                     <td data-order="{{ pull_request.date }}">{{ pull_request.age }}</td>
                     <td>
                         <table class="table table-striped table-bordered table-hover table-condensed">
                             <tbody>
                                 {% for review in pull_request.reviews %}
-                                <tr {% if review.state == 'Approve' %}class="success"{% endif %}
+                                <tr {% if review.state == 'Approve' or review.state == 'APPROVED' %}class="success"{% endif %}
                                     {% if review.state == 'Disapprove' or review.state == 'Needs Fixing' %}class="danger"{% endif %}
                                     {% if review.state == 'Needs Information' %}class="warning"{% endif %}>
                                     <td>{{ review.owner }}</td>
@@ -76,30 +78,39 @@
         var repo_data_table = $('.repo').DataTable({
              paging: false
         });
-        function show_row_with_state(state){
+        function show_row_with_states(states){
             $.fn.dataTable.ext.search.pop();
             repo_data_table.draw();
             $.fn.dataTable.ext.search.push(
                function(settings, data, dataIndex) {
-                  return $(repo_data_table.row(dataIndex).node()).attr('data-state') == state;
+                  return states.indexOf($(repo_data_table.row(dataIndex).node()).attr('data-state')) !== -1;
                }
             );
             repo_data_table.draw();
         }
         $("#workinprogress").click(function(event) {
             event.preventDefault();
-            show_row_with_state("work in progress");
+            $(this).addClass('btn-primary').removeClass('btn-default');
+            $('#needsreview').removeClass('btn-primary').addClass('btn-default');
+            $('#reset').removeClass('btn-primary').addClass('btn-default');
+            show_row_with_states(["work in progress"]);
         });
 
         $("#needsreview").click(function(event) {
             event.preventDefault();
-            show_row_with_state("needs review");
+            $(this).addClass('btn-primary').removeClass('btn-default');
+            $('#reset').removeClass('btn-primary').addClass('btn-default');
+            $('#workinprogress').removeClass('btn-primary').addClass('btn-default');
+            show_row_with_states(["needs review", "open"]);
         });
 
-        show_row_with_state("needs review");
+        show_row_with_states(["needs review", "open"]);
 
         $("#reset").click(function(event) {
             event.preventDefault();
+            $(this).addClass('btn-primary').removeClass('btn-default');
+            $('#needsreview').removeClass('btn-primary').addClass('btn-default');
+            $('#workinprogress').removeClass('btn-primary').addClass('btn-default');
             $.fn.dataTable.ext.search.pop();
             repo_data_table.draw();
         });
