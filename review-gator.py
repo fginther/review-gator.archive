@@ -78,7 +78,7 @@ class PullRequest(object):
 
     @property
     def age(self):
-        #print(u'{}'.format(self))
+        # print(u'{}'.format(self))
         return date_to_age(self.date)
 
     @property
@@ -89,11 +89,11 @@ class PullRequest(object):
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
         for r in self.reviews:
-            if (review.owner == r['owner'] and review.date > r['date']):
+            if review.owner == r['owner'] and review.date > r['date']:
                 self.reviews.remove(r)
                 break
         self.reviews.append(merge_two_dicts(review.__dict__,
-                                            {'age': review.age }))
+                                            {'age': review.age}))
 
 
 class GithubPullRequest(PullRequest):
@@ -102,7 +102,7 @@ class GithubPullRequest(PullRequest):
                  latest_activity=None):
         date = pytz.utc.localize(date)
         super(GithubPullRequest, self).__init__(
-            'github', handle, url, title, owner, state, date, review_count,
+                'github', handle, url, title, owner, state, date, review_count,
                 latest_activity=latest_activity)
 
 
@@ -111,8 +111,8 @@ class LaunchpadPullRequest(PullRequest):
     def __init__(self, handle, url, title, owner, state, date, review_count,
                  latest_activity=None):
         super(LaunchpadPullRequest, self).__init__(
-            'launchpad', handle, url, title, owner, state, date, review_count,
-                latest_activity=latest_activity)
+                'launchpad', handle, url, title, owner, state, date,
+                review_count, latest_activity=latest_activity)
 
 
 class Review(object):
@@ -131,7 +131,7 @@ class Review(object):
 
     @property
     def age(self):
-        #print(u'{}'.format(self))
+        # print(u'{}'.format(self))
         return date_to_age(self.date)
 
 
@@ -191,25 +191,48 @@ def get_prs(gr, repo, review_count):
     pull_requests = []
     pulls = repo.get_pulls()
     for p in pulls:
-        reviews = {}
         pr = GithubPullRequest(p, p.html_url, p.title, p.head.repo.owner.login,
                             p.state, p.created_at, review_count)
         gr.add(pr)
         pull_requests.append(pr)
         raw_reviews = p.get_reviews()
-        index = 0
+        raw_comments = p.get_comments()
+        raw_issue_comments = p.get_issue_comments()
         pr_latest_activity = None
+
+        # Find most recent issue comment activity on pull request
+        for raw_issue_comment in raw_issue_comments:
+            if pr_latest_activity is None or \
+                            pytz.utc.localize(
+                                    raw_issue_comment.created_at) > \
+                            pr_latest_activity:
+                pr_latest_activity = pytz.utc.localize(
+                        raw_issue_comment.created_at)
+
+        # Find most recent comment activity on pull request
+        for raw_comment in raw_comments:
+            if pr_latest_activity is None or \
+                            pytz.utc.localize(
+                                    raw_comment.created_at) > \
+                            pr_latest_activity:
+                pr_latest_activity = pytz.utc.localize(raw_comment.created_at)
+
         for raw_review in raw_reviews:
-            index += 1
             owner = raw_review.user.login
             review = GithubReview(raw_review, raw_review.html_url, owner,
-                               raw_review.state, raw_review.submitted_at)
+                                  raw_review.state, raw_review.submitted_at)
             pr.add_review(review)
+
+            # Review might be more recent than a comment
             if pr_latest_activity is None or \
-                            raw_review.submitted_at > pr_latest_activity:
-                pr_latest_activity = raw_review.submitted_at.replace(
-                        tzinfo=pytz.UTC)
+                    pytz.utc.localize(
+                            raw_review.submitted_at) > \
+                    pr_latest_activity:
+                pr_latest_activity = pytz.utc.localize(
+                        raw_review.submitted_at)
+
         pr.latest_activity = pr_latest_activity
+
     return pull_requests
 
 
@@ -253,7 +276,8 @@ def get_mp_title(mp):
         source = '<strong>'
         source += mp.source_git_repository_link.replace(
             'https://api.launchpad.net/devel/', '')
-        source += ':' + git_source.replace('refs/heads/', '') + '</strong> &rArr; '
+        source += ':' + git_source.replace('refs/heads/', '') + \
+                  '</strong> &rArr; '
         title += source
     else:
         source = '<strong>'
@@ -302,7 +326,14 @@ def get_mps(repo, branch):
                                   mp.queue_status,
                                   mp.date_created, 2)
         repo.add(pr)
-        pr_latest_activity = None
+        mp_latest_activity = None
+
+        # Find most recent activity on merge proposal
+        for mp_comment in mp.all_comments:
+            if mp_latest_activity is None or \
+                            mp_comment.date_created > mp_latest_activity:
+                mp_latest_activity = mp_comment.date_created
+
         for vote in mp.votes:
             owner = vote.reviewer.display_name
             comment = vote.comment
@@ -313,13 +344,13 @@ def get_mps(repo, branch):
                 review_date = comment.date_created
             review = LaunchpadReview(vote, vote.web_link, owner, result,
                                      review_date)
-            if pr_latest_activity is None or review_date > pr_latest_activity:
-                pr_latest_activity = review_date
+
+            # MP Vote might be more recent than a comment
+            if mp_latest_activity is None or review_date > mp_latest_activity:
+                mp_latest_activity = review_date
             pr.add_review(review)
-        pr.latest_activity = pr_latest_activity
 
-
-
+        pr.latest_activity = mp_latest_activity
 
 
 def get_branches_for_owner(lp, collected, owner, max_age):
