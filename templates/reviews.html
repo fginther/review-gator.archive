@@ -12,6 +12,11 @@
         .repo-state-toggle{
             margin: 1em 0;
         }
+        #generated-time{
+            font-size: 80%;
+            margin-top: 1em;
+            text-align: center;
+        }
     </style>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/bs-3.3.7/jq-2.2.4/dt-1.10.15/kt-2.2.1/r-2.1.1/datatables.min.css"/>
 
@@ -72,6 +77,8 @@
         </tbody>
         </table>
     </div>
+
+    <div id="generated-time">Generated at {{ generation_time.strftime('%Y-%m-%d %H:%M:%S') }}</div>
 
 <script type="text/javascript" charset="utf-8">
     $(document).ready(function() {
