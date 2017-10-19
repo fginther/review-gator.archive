@@ -265,7 +265,7 @@ def render(repos):
     env = Environment(loader=FileSystemLoader('templates'))
     tmpl = env.get_template('reviews.html')
     with open('dist/reviews.html', 'w') as out_file:
-        context = {'repos': data, 'generation_time': datetime.datetime.now()}
+        context = {'repos': data, 'generation_time': NOW}
         out_file.write(tmpl.render(context).encode('utf-8'))
 
 
