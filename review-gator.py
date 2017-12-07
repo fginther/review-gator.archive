@@ -293,7 +293,7 @@ def get_mp_title(mp):
         target += ':' + git_target.replace('refs/heads/', '')
         title += target
     else:
-        target = mp.source_branch_link.replace(
+        target = mp.target_branch_link.replace(
             'https://api.launchpad.net/devel/', '')
         title += target
 
