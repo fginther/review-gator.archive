@@ -1,0 +1,7 @@
+click
+humanize
+Jinja2
+pytz
+PyYAML
+-e git+https://github.com/fginther/PyGithub.git@add-reviews#egg=PyGithub
+-e git+https://github.com/mpdavis/python-jose.git#egg=python-jose

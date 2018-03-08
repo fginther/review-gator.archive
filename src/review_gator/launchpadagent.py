@@ -31,7 +31,7 @@ class AuthorizeRequestTokenWithConsole(RequestTokenAuthorizationEngine):
 
         """
         authorization_url = self.authorization_url(request_token)
-        print WAITING_FOR_USER.format(authorization_url)
+        print(WAITING_FOR_USER.format(authorization_url))
         # if we don't flush we may not see the message
         sys.stdout.flush()
         while credentials.access_token is None:
@@ -57,9 +57,10 @@ def get_launchpad(launchpadlib_dir=None):
     """ return a launchpad API class. In case launchpadlib_dir is
     specified used that directory to store launchpadlib cache instead of
     the default """
+    creds_prefix = os.environ.get('SNAP_USER_COMMON', os.path.expanduser('~'))
     store = UnencryptedFileCredentialStore(
-            os.path.join(os.path.expanduser('~'), '.launchpad.credentials'))
-    lp_app = 'landscape-review-aggregator'
+            os.path.join(creds_prefix, '.launchpad.credentials'))
+    lp_app = 'review-gator'
     lp_env = 'production'
     lp_version = 'devel'
 

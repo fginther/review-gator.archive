@@ -1,0 +1,6 @@
+graft src/review_gator
+graft src/review_gator/templates
+
+include MANIFEST.in
+
+global-exclude *.py[cod] __pycache__ *.so *.dylib .gitignore

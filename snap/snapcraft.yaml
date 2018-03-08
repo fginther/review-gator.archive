@@ -1,0 +1,41 @@
+name: review-gator
+version: '0.1'
+summary: Helpful utility to render merge proposals as HTML
+description: |
+  Helpful utility to render merge proposals from launchpad and pull
+  requests from github as HTML
+
+  review-gator.py --help # to see all available options
+  review-gator.py --config branches.yaml # branches must be under your home directory
+  export GITHUB_TOKEN=%GITHUBAPITOKEN; review-gator.py --config branches.yaml # if you have any github repos configured
+  review-gator.py --config branches.yaml --config-skeleton # Output sample config skeleton
+
+grade: stable
+confinement: strict
+
+apps:
+  review-gator:
+    command: wrapper
+    plugs:
+      - network
+      - home
+
+parts:
+  review-gator-wrapper:
+    plugin: dump
+    source: snap
+    prepare: |
+      chmod +x wrapper
+    stage:
+      - usr/bin/wrapper
+    organize:
+      wrapper: usr/bin/wrapper
+
+  review-gator:
+    plugin: python
+    python-version: python3
+    source: .
+    stage-packages:
+      - python3-launchpadlib
+      - git
+      - python3-pip
