@@ -12,3 +12,5 @@
 /github_bash.env
 *.snap
 *.bz2
+/build-py3.txt
+/build.txt

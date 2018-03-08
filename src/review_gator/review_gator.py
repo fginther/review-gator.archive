@@ -264,15 +264,16 @@ def render(repos):
     abs_templates_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(abs_templates_path))
     tmpl = env.get_template('reviews.html')
-    output_directory = os.environ.get('SNAP_USER_COMMON', ".")
-    output_directory = os.path.join(output_directory, "dist")
+    output_directory = os.environ.get('SNAP_USER_COMMON', "/tmp/review_gator/")
+    output_directory = os.path.realpath(os.path.join(output_directory, "dist"))
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
     output_html_filepath = os.path.join(output_directory, 'reviews.html')
     with open(output_html_filepath, 'w') as out_file:
         context = {'repos': data, 'generation_time': NOW}
         out_file.write(tmpl.render(context))
-        print("{} written".format(output_html_filepath))
+        print("**** {} written ****".format(output_html_filepath))
+        print("file://{}".format(output_html_filepath))
 
 
 def get_mp_title(mp):
