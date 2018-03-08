@@ -1,0 +1,21 @@
+launchpad:
+    owners:
+        # Launchpad username
+        LAUNCHPAD-USERNAME:
+            max-age: 30
+    branches:
+        # Full path to repo
+        LAUNCHPAD-BZR-REPO-PATH:
+            review-count: 2
+github:
+    repos:
+        GITHUB-USERNAME:
+            GITHUB-PROJECT-NAME:
+                review-count: 2
+lp-git:
+    owners:
+        LAUNCHPAD-USERNAME:
+            max-age: 30
+    repos:
+        LAUNCHPAD-GIT-REPO-PATH:
+            review-count: 2

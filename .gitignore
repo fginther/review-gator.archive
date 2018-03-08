@@ -5,3 +5,10 @@
 /branches.yaml
 !/templates/reviews.html
 /dist/reviews.html
+/dist/
+/.floo
+/.flooignore
+/github.env
+/github_bash.env
+*.snap
+*.bz2

@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 
 import datetime
-import github
 import os
-import pytz
 import sys
+
+import click
+import github
+import humanize
+import pytz
 import yaml
 
 from jinja2 import Environment, FileSystemLoader
-import launchpadagent
+from pkg_resources import resource_filename
+
+from . import launchpadagent
 
 MAX_DESCRIPTION_LENGTH = 80
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
-ONE_DAY = datetime.timedelta(days=1)
-ONE_HOUR = datetime.timedelta(hours=1)
 
 
 class Repo(object):
@@ -157,11 +160,7 @@ def date_to_age(date):
         return None
 
     age = NOW - date
-    if age > ONE_DAY:
-        return '{} days'.format(age.days)
-    if age > ONE_HOUR:
-        return '{} hours'.format(age.seconds / 3600)
-    return '{} minutes'.format(age.seconds / 60)
+    return humanize.naturaltime(age)
 
 
 def merge_two_dicts(x, y):
@@ -175,7 +174,7 @@ def get_all_repos(gh, sources):
     '''Return all repos, prs and reviews for the given github sources.'''
     repos = []
     for org in sources:
-        for name, data in sources[org].iteritems():
+        for name, data in sources[org].items():
             repo = gh.get_repo('{}/{}'.format(org.replace(' ', ''), name))
             review_count = sources[org][name]['review-count']
             gr = GithubRepo(repo, repo.html_url, repo.ssh_url)
@@ -262,11 +261,18 @@ def get_repo_data(repos):
 def render(repos):
     '''Render the repositories into an html file.'''
     data = get_repo_data(repos)
-    env = Environment(loader=FileSystemLoader('templates'))
+    abs_templates_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
+    env = Environment(loader=FileSystemLoader(abs_templates_path))
     tmpl = env.get_template('reviews.html')
-    with open('dist/reviews.html', 'w') as out_file:
+    output_directory = os.environ.get('SNAP_USER_COMMON', ".")
+    output_directory = os.path.join(output_directory, "dist")
+    # Make sure the output directory exists
+    os.makedirs(output_directory, exist_ok=True)
+    output_html_filepath = os.path.join(output_directory, 'reviews.html')
+    with open(output_html_filepath, 'w') as out_file:
         context = {'repos': data, 'generation_time': NOW}
-        out_file.write(tmpl.render(context).encode('utf-8'))
+        out_file.write(tmpl.render(context))
+        print("{} written".format(output_html_filepath))
 
 
 def get_mp_title(mp):
@@ -360,7 +366,6 @@ def get_branches_for_owner(lp, collected, owner, max_age):
     This is used to identify any recently submitted prs that escaped the
     whitelist of launchpad repositories. This only applies to launchpad.'''
     age_gate = NOW - datetime.timedelta(days=max_age)
-    owner = owner.decode('utf-8')
     team = lp.people(owner)
     branches = team.getBranches(modified_since=age_gate)
     repos = []
@@ -377,10 +382,11 @@ def get_branches_for_owner(lp, collected, owner, max_age):
 
 def get_branches(sources):
     '''Return all repos, prs and reviews for the given launchpad sources.'''
-    launchpad_cachedir = os.path.join('/tmp/get_reviews/.launchpadlib')
+    cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
+    launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
     repos = []
-    for source, data in sources['branches'].iteritems():
+    for source, data in sources['branches'].items():
         print(source, data)
         b = lp.branches.getByUrl(url=source)
         repo = LaunchpadRepo(b, b.web_link, b.display_name)
@@ -390,7 +396,7 @@ def get_branches(sources):
         print(repo)
     collected = [r.name for r in repos]
     print('collected: {}'.format(collected))
-    for owner, data in sources['owners'].iteritems():
+    for owner, data in sources['owners'].items():
         print(owner, data)
         repos.extend(get_branches_for_owner(
             lp, collected, owner, data['max-age']))
@@ -399,10 +405,11 @@ def get_branches(sources):
 
 def get_lp_repos(sources):
     '''Return all repos, prs and reviews for the given lp-git source.'''
-    launchpad_cachedir = os.path.join('/tmp/get_reviews/.launchpadlib')
+    cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
+    launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
     repos = []
-    for source, data in sources['repos'].iteritems():
+    for source, data in sources['repos'].items():
         print(source, data)
         b = lp.git_repositories.getByPath(path=source.replace('lp:', ''))
         repo = LaunchpadRepo(b, b.web_link, b.display_name)
@@ -417,24 +424,46 @@ def get_repos(sources):
     # XXX: Generate a warning if no user and password are found
     if os.environ.get('GITHUB_TOKEN'):
         gh = github.Github(os.environ.get('GITHUB_TOKEN'))
-    else:
-        gh = github.Github(os.environ.get('GITHUB_USER'),
+    elif os.environ.get('GITHUB_USER') and os.environ.get('GITHUB_PASSWORD'):
+        gh = github.Github(os.environ.get('c'),
                            os.environ.get('GITHUB_PASSWORD'))
+    else:
+        print("*** You have configured Github repositories but not supplied any Github credentials ***")
+        print("You can either set GITHUB_TOKEN environment variable or set GITHUB_USER and GITHUB_PASSWORD.")
+        print("Rendering will proceed but will not include any of your Github repositories.")
+        return []
+
     repos = get_all_repos(gh, sources['repos'])
     return repos
 
 
 def get_source_info(source):
     '''Load the sources file.'''
-    with open(source) as infile:
-        data = yaml.safe_load(infile.read())
+    data = yaml.load(source.read())
     return data
 
 
-def main():
+@click.command()
+@click.option('--config', required=True, type=click.File('r'),
+              help="Config yaml specifying which repositories/branches to query."
+                   "{}".format(" When using the review-gator snap this"
+                               " config must reside under $HOME."
+                               if os.environ.get('SNAP', None) else ""))
+@click.option('--config-skeleton', is_flag=True, default=False,
+              help='Print example config.')
+def main(config, config_skeleton):
     '''Start here.'''
-    # XXX: Use argparse instead of raw sys.argv
-    sources = get_source_info(sys.argv[1])
+    if config_skeleton:
+        with open(resource_filename(
+                'review_gator', 'config-skeleton.yaml'), 'r') as config_file:
+            package_config = yaml.load(config_file)
+
+            output = yaml.dump(package_config, Dumper=yaml.Dumper)
+            print("# Sample config.")
+            print(output)
+            exit(0)
+
+    sources = get_source_info(config)
     repos = []
     if 'lp-git' in sources:
         repos.extend(get_lp_repos(sources['lp-git']))
