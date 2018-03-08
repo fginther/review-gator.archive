@@ -60,7 +60,7 @@ def get_launchpad(launchpadlib_dir=None):
     creds_prefix = os.environ.get('SNAP_USER_COMMON', os.path.expanduser('~'))
     store = UnencryptedFileCredentialStore(
             os.path.join(creds_prefix, '.launchpad.credentials'))
-    lp_app = 'landscape-review-aggregator'
+    lp_app = 'review-gator'
     lp_env = 'production'
     lp_version = 'devel'
 
