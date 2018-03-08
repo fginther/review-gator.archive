@@ -422,7 +422,6 @@ def get_lp_repos(sources):
 
 
 def get_repos(sources):
-    # XXX: Generate a warning if no user and password are found
     if os.environ.get('GITHUB_TOKEN'):
         gh = github.Github(os.environ.get('GITHUB_TOKEN'))
     elif os.environ.get('GITHUB_USER') and os.environ.get('GITHUB_PASSWORD'):
