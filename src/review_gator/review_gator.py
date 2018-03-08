@@ -426,7 +426,7 @@ def get_repos(sources):
     if os.environ.get('GITHUB_TOKEN'):
         gh = github.Github(os.environ.get('GITHUB_TOKEN'))
     elif os.environ.get('GITHUB_USER') and os.environ.get('GITHUB_PASSWORD'):
-        gh = github.Github(os.environ.get('c'),
+        gh = github.Github(os.environ.get('GITHUB_USER'),
                            os.environ.get('GITHUB_PASSWORD'))
     else:
         print("*** You have configured Github repositories but not supplied any Github credentials ***")
