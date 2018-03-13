@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 from pkg_resources import resource_filename
 
 from . import launchpadagent
+from . import clicklib
 
 MAX_DESCRIPTION_LENGTH = 80
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
@@ -258,14 +259,17 @@ def get_repo_data(repos):
     return repo_data
 
 
-def render(repos):
+def render(repos, output_directory=None):
     '''Render the repositories into an html file.'''
     data = get_repo_data(repos)
-    abs_templates_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
+    abs_templates_path = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(abs_templates_path))
     tmpl = env.get_template('reviews.html')
-    output_directory = os.environ.get('SNAP_USER_COMMON', "/tmp/review_gator/")
-    output_directory = os.path.realpath(os.path.join(output_directory, "dist"))
+    if not output_directory:
+        output_directory = os.environ.get('SNAP_USER_COMMON',
+                                          "/tmp/review_gator/")
+
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
     output_html_filepath = os.path.join(output_directory, 'reviews.html')
@@ -421,16 +425,20 @@ def get_lp_repos(sources):
     return repos
 
 
-def get_repos(sources):
-    if os.environ.get('GITHUB_TOKEN'):
-        gh = github.Github(os.environ.get('GITHUB_TOKEN'))
-    elif os.environ.get('GITHUB_USER') and os.environ.get('GITHUB_PASSWORD'):
-        gh = github.Github(os.environ.get('GITHUB_USER'),
-                           os.environ.get('GITHUB_PASSWORD'))
+def get_repos(sources, github_username, github_password, github_token):
+    if github_token:
+        gh = github.Github(github_token)
+    elif github_username and github_password:
+        gh = github.Github(github_username,
+                           github_password)
     else:
-        print("*** You have configured Github repositories but not supplied any Github credentials ***")
-        print("You can either set GITHUB_TOKEN environment variable or set GITHUB_USER and GITHUB_PASSWORD.")
-        print("Rendering will proceed but will not include any of your Github repositories.")
+        print("*** You have configured Github repositories but not supplied "
+              "any Github credentials ***")
+        print("You can either pass these values to review-gator or set "
+              "GITHUB_TOKEN or (GITHUB_USERNAME and GITHUB_PASSWORD) "
+              "environment variables.")
+        print("Rendering will proceed but will not include any of your "
+              "Github repositories.")
         return []
 
     repos = get_all_repos(gh, sources['repos'])
@@ -444,15 +452,42 @@ def get_source_info(source):
 
 
 @click.command()
-@click.option('--config', required=True, type=click.File('r'),
-              help="Config yaml specifying which repositories/branches to query."
-                   "{}".format(" When using the review-gator snap this"
-                               " config must reside under $HOME."
-                               if os.environ.get('SNAP', None) else ""))
 @click.option('--config-skeleton', is_flag=True, default=False,
               help='Print example config.')
-def main(config, config_skeleton):
-    '''Start here.'''
+@click.option('--config', required=True, type=click.File('r'),
+              help="Config yaml specifying which repositories/branches to "
+                   "query.{}".format(" When using the review-gator snap this"
+                                     " config must reside under $HOME."
+                                     if os.environ.get('SNAP', None) else ""),
+              cls=clicklib.NotRequiredIf,
+              mutually_exclusive=['config_skeleton'])
+@click.option('--output-directory', envvar='REVIEW_GATOR_OUTPUT_DIRECTORY',
+              required=False, type=click.Path(), default=lambda:
+              os.environ.get('SNAP_USER_COMMON', "/tmp/review_gator/"),
+              help="Output directory. [default: {}]. You can also set "
+                   "REVIEW_GATOR_OUTPUT_DIRECTORY as an environment "
+                   "variable.{}"
+                   .format(os.environ.get('SNAP_USER_COMMON',
+                                          "/tmp/review_gator/"),
+                           " When using the review-gator snap this config "
+                           "must reside under $HOME."
+                           if os.environ.get('SNAP', None) else ""))
+@click.option('--github-username', envvar='GITHUB_USERNAME', required=False,
+              help="Your github username."
+                   "You can also set GITHUB_USERNAME as an environment "
+                   "variable.", default=None)
+@click.option('--github-password', envvar='GITHUB_PASSWORD', required=False,
+              help="Your github password."
+                   "You can also set GITHUB_PASSWORD as an environment "
+                   "variable.", default=None)
+@click.option('--github-token', envvar='GITHUB_TOKEN', required=False,
+              help="Your github api token. If you provide this then you do not"
+                   "need to provide username and password. "
+                   "You can also set GITHUB_TOKEN as an environment "
+                   "variable.", default=None)
+def main(config_skeleton, config, output_directory,
+         github_username, github_password, github_token):
+    """Start here."""
     if config_skeleton:
         with open(resource_filename(
                 'review_gator', 'config-skeleton.yaml'), 'r') as config_file:
@@ -470,8 +505,9 @@ def main(config, config_skeleton):
     if 'launchpad' in sources:
         repos.extend(get_branches(sources['launchpad']))
     if 'github' in sources:
-        repos.extend(get_repos(sources['github']))
-    render(repos)
+        repos.extend(get_repos(sources['github'],
+                               github_username, github_password, github_token))
+    render(repos, output_directory)
 
 
 if __name__ == '__main__':
