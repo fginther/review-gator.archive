@@ -528,6 +528,11 @@ def main(config_skeleton, config, output_directory,
         # the process to reduce CPU usage. https://linux.die.net/man/1/nice
         os.nice(19)
         while True:
+            next_poll = format_datetime(
+                    pytz.utc.localize(
+                            datetime.datetime.utcnow() +
+                            datetime.timedelta(seconds=poll_interval)))
+            print("Next run @ {}".format(next_poll))
             time.sleep(poll_interval)  # wait before checking again
             aggregate_reviews(sources, output_directory, github_password,
                               github_token, github_username)
