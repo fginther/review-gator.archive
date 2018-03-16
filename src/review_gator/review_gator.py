@@ -510,6 +510,7 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
 def main(config_skeleton, config, output_directory,
          github_username, github_password, github_token, poll, poll_interval):
     """Start here."""
+    global NOW
     if config_skeleton:
         with open(resource_filename(
                 'review_gator', 'config-skeleton.yaml'), 'r') as config_file:
@@ -534,6 +535,7 @@ def main(config_skeleton, config, output_directory,
                             datetime.timedelta(seconds=poll_interval)))
             print("Next run @ {}".format(next_poll))
             time.sleep(poll_interval)  # wait before checking again
+            NOW = pytz.utc.localize(datetime.datetime.utcnow())
             aggregate_reviews(sources, output_directory, github_password,
                               github_token, github_username)
 
