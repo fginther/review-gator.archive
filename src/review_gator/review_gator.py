@@ -455,17 +455,21 @@ def get_sources(source):
 
 def aggregate_reviews(sources, output_directory, github_password, github_token,
                       github_username):
-    repos = []
-    if 'lp-git' in sources:
-        repos.extend(get_lp_repos(sources['lp-git']))
-    if 'launchpad' in sources:
-        repos.extend(get_branches(sources['launchpad']))
-    if 'github' in sources:
-        repos.extend(get_repos(sources['github'],
-                               github_username, github_password, github_token))
-    render(repos, output_directory)
-    last_poll = format_datetime(pytz.utc.localize(datetime.datetime.utcnow()))
-    print("Last run @ {}".format(last_poll))
+    try:
+        repos = []
+        if 'lp-git' in sources:
+            repos.extend(get_lp_repos(sources['lp-git']))
+        if 'launchpad' in sources:
+            repos.extend(get_branches(sources['launchpad']))
+        if 'github' in sources:
+            repos.extend(get_repos(sources['github'],
+                                   github_username, github_password, github_token))
+        render(repos, output_directory)
+        last_poll = format_datetime(pytz.utc.localize(datetime.datetime.utcnow()))
+        print("Last run @ {}".format(last_poll))
+    except TimeoutError as e:
+        print("Error querying github/launchpad: %s. "
+              "We will retry. \n", str(e))
 
 
 @click.command()
