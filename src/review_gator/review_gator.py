@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import socket
 import sys
 import time
 
@@ -467,8 +468,11 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
         render(repos, output_directory)
         last_poll = format_datetime(pytz.utc.localize(datetime.datetime.utcnow()))
         print("Last run @ {}".format(last_poll))
+    except socket.timeout as se:
+        print("Socket.timeout error querying github/launchpad: %s. "
+              "We will retry. \n", str(se))
     except TimeoutError as e:
-        print("Error querying github/launchpad: %s. "
+        print("TimeoutError error querying github/launchpad: %s. "
               "We will retry. \n", str(e))
 
 
