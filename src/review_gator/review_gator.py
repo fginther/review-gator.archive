@@ -200,7 +200,7 @@ def get_prs(gr, repo, review_count):
         raw_reviews = p.get_reviews()
         raw_comments = p.get_comments()
         raw_issue_comments = p.get_issue_comments()
-        pr_latest_activity = None
+        pr_latest_activity = p.created_at
 
         # Find most recent issue comment activity on pull request
         for raw_issue_comment in raw_issue_comments:
