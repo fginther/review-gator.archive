@@ -525,6 +525,7 @@ def main(config_skeleton, config, output_directory,
             print("# Sample config.")
             print(output)
             exit(0)
+
     sources = get_sources(config)
     aggregate_reviews(sources, output_directory, github_password,
                       github_token, github_username)
