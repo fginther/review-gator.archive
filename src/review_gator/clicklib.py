@@ -1,3 +1,10 @@
+"""
+Click Option class to help make options required if other optional
+option is unset
+
+https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is/44349292
+"""
+
 from click import Option, UsageError
 
 
