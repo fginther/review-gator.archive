@@ -259,16 +259,13 @@ def get_repo_data(repos):
     return repo_data
 
 
-def render(repos, output_directory=None):
+def render(repos, output_directory):
     '''Render the repositories into an html file.'''
     data = get_repo_data(repos)
     abs_templates_path = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(abs_templates_path))
     tmpl = env.get_template('reviews.html')
-    if not output_directory:
-        output_directory = os.environ.get('SNAP_USER_COMMON',
-                                          "/tmp/review_gator/")
 
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
