@@ -1,3 +1,4 @@
+babel
 click
 humanize
 Jinja2

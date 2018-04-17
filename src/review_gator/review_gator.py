@@ -2,7 +2,9 @@
 
 import datetime
 import os
+import socket
 import sys
+import time
 
 import click
 import github
@@ -10,6 +12,7 @@ import humanize
 import pytz
 import yaml
 
+from babel.dates import format_datetime
 from jinja2 import Environment, FileSystemLoader
 from pkg_resources import resource_filename
 
@@ -198,7 +201,7 @@ def get_prs(gr, repo, review_count):
         raw_reviews = p.get_reviews()
         raw_comments = p.get_comments()
         raw_issue_comments = p.get_issue_comments()
-        pr_latest_activity = p.created_at
+        pr_latest_activity = pytz.utc.localize(p.created_at)
 
         # Find most recent issue comment activity on pull request
         for raw_issue_comment in raw_issue_comments:
@@ -442,10 +445,32 @@ def get_repos(sources, github_username, github_password, github_token):
     return repos
 
 
-def get_source_info(source):
+def get_sources(source):
     '''Load the sources file.'''
     data = yaml.load(source.read())
     return data
+
+
+def aggregate_reviews(sources, output_directory, github_password, github_token,
+                      github_username):
+    try:
+        repos = []
+        if 'lp-git' in sources:
+            repos.extend(get_lp_repos(sources['lp-git']))
+        if 'launchpad' in sources:
+            repos.extend(get_branches(sources['launchpad']))
+        if 'github' in sources:
+            repos.extend(get_repos(sources['github'],
+                                   github_username, github_password, github_token))
+        render(repos, output_directory)
+        last_poll = format_datetime(pytz.utc.localize(datetime.datetime.utcnow()))
+        print("Last run @ {}".format(last_poll))
+    except socket.timeout as se:
+        print("Socket.timeout error querying github/launchpad: %s. "
+              "We will retry. \n", str(se))
+    except TimeoutError as e:
+        print("TimeoutError error querying github/launchpad: %s. "
+              "We will retry. \n", str(e))
 
 
 @click.command()
@@ -482,9 +507,15 @@ def get_source_info(source):
                    "need to provide username and password. "
                    "You can also set GITHUB_TOKEN as an environment "
                    "variable.", default=None)
+@click.option('--poll', is_flag=True, default=False,
+              help='Keep aggregating reviews at a specified interval')
+@click.option('--poll-interval', type=int, required=False, default=600,
+              help="Interval, in seconds, between each version check "
+                   "[default: 600 seconds]")
 def main(config_skeleton, config, output_directory,
-         github_username, github_password, github_token):
+         github_username, github_password, github_token, poll, poll_interval):
     """Start here."""
+    global NOW
     if config_skeleton:
         with open(resource_filename(
                 'review_gator', 'config-skeleton.yaml'), 'r') as config_file:
@@ -495,16 +526,24 @@ def main(config_skeleton, config, output_directory,
             print(output)
             exit(0)
 
-    sources = get_source_info(config)
-    repos = []
-    if 'lp-git' in sources:
-        repos.extend(get_lp_repos(sources['lp-git']))
-    if 'launchpad' in sources:
-        repos.extend(get_branches(sources['launchpad']))
-    if 'github' in sources:
-        repos.extend(get_repos(sources['github'],
-                               github_username, github_password, github_token))
-    render(repos, output_directory)
+    sources = get_sources(config)
+    aggregate_reviews(sources, output_directory, github_password,
+                      github_token, github_username)
+
+    if poll:
+        # We do use time.sleep which is blocking so it is best to 'nice'
+        # the process to reduce CPU usage. https://linux.die.net/man/1/nice
+        os.nice(19)
+        while True:
+            next_poll = format_datetime(
+                    pytz.utc.localize(
+                            datetime.datetime.utcnow() +
+                            datetime.timedelta(seconds=poll_interval)))
+            print("Next run @ {}".format(next_poll))
+            time.sleep(poll_interval)  # wait before checking again
+            NOW = pytz.utc.localize(datetime.datetime.utcnow())
+            aggregate_reviews(sources, output_directory, github_password,
+                              github_token, github_username)
 
 
 if __name__ == '__main__':
