@@ -95,9 +95,9 @@ class PullRequest(object):
 
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
-        for r in self.reviews:
+        for idx, r in enumerate(self.reviews):
             if review.owner == r['owner'] and review.date > r['date']:
-                self.reviews.remove(r)
+                del self.reviews[idx]
                 break
         self.reviews.append(merge_two_dicts(review.__dict__,
                                             {'age': review.age}))
@@ -143,9 +143,11 @@ class Review(object):
 
 
 class GithubReview(Review):
+
     '''A github pull request review.'''
     def __init__(self, handle, url, owner, state, date):
         date = pytz.utc.localize(date)
+
         super(GithubReview, self).__init__(
             'github', handle, url, owner, state, date)
 
