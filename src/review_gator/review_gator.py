@@ -166,6 +166,11 @@ def date_to_age(date):
         return None
 
     age = NOW - date
+    if age < datetime.timedelta():
+        # A negative timedelta means the time is in the future; this will be
+        # due to inconsistent clocks across systems, so assume that there is no
+        # delta
+        age = datetime.timedelta()
     return humanize.naturaltime(age)
 
 
