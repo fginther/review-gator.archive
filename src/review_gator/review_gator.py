@@ -16,7 +16,6 @@ from babel.dates import format_datetime
 from jinja2 import Environment, FileSystemLoader
 from pkg_resources import resource_filename
 
-from . import launchpadagent
 from . import clicklib
 
 MAX_DESCRIPTION_LENGTH = 80
@@ -465,6 +464,9 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
         if 'lp-git' in sources:
             repos.extend(get_lp_repos(sources['lp-git']))
         if 'launchpad' in sources:
+            # Only import the launchpad code conditionally. This prevents having an
+            # install time dependency on launchpad libs.
+            from . import launchpadagent
             repos.extend(get_branches(sources['launchpad']))
         if 'github' in sources:
             repos.extend(get_repos(sources['github'],
