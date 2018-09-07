@@ -12,9 +12,8 @@ Installation
 The following steps should leave you with a working script:
 
 ```
-virtualenv -p python3  .venv
+virtualenv -p python3 --system-site-packages .venv
 source .venv/bin/activate
-pip install -r requirements.txt
 pip install -e .
 GITHUB_TOKEN=... review-gator --config branches.yaml
 ```
