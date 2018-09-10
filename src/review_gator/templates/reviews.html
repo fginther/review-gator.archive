@@ -59,8 +59,8 @@
                             <tbody>
                                 {% for review in pull_request.reviews %}
                                 <tr {% if review.state == 'Approve' or review.state == 'APPROVED' %}class="success"{% endif %}
-                                    {% if review.state == 'Disapprove' or review.state == 'Needs Fixing' %}class="danger"{% endif %}
-                                    {% if review.state == 'Needs Information' or review.state == 'CHANGES_REQUESTED' or review.state == 'COMMENTED' %}class="warning"{% endif %}>
+                                    {% if review.state == 'Disapprove' or review.state == 'Needs Fixing' or review.state == "CHANGES_REQUESTED" %}class="danger"{% endif %}
+                                    {% if review.state == 'Needs Information' or review.state == 'COMMENTED' %}class="warning"{% endif %}>
                                     <td>{{ review.owner }}</td>
                                     <td>{{ review.state }}</td>
                                     <td>{{ review.age }}</td>
