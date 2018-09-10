@@ -201,7 +201,7 @@ def get_prs(gr, repo, review_count):
     pull_requests = []
     pulls = repo.get_pulls()
     for p in pulls:
-        pr = GithubPullRequest(p, p.html_url, p.title, p.head.repo.owner.login,
+        pr = GithubPullRequest(p, p.html_url, p.title, p.user.login,
                             p.state, p.created_at, review_count)
         gr.add(pr)
         pull_requests.append(pr)
