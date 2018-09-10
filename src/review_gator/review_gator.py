@@ -289,7 +289,7 @@ def render(repos, output_directory):
         print("**** {} written ****".format(output_html_filepath))
         print("file://{}".format(output_html_filepath))
     output_vendor_dir = os.path.join(output_directory, 'vendor')
-    shutil.rmtree(output_vendor_dir)
+    shutil.rmtree(output_vendor_dir, True)
     # Copy the vendored CSS and JS
     shutil.copytree(abs_vendor_path, output_vendor_dir)
 
