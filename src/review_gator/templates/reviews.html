@@ -28,7 +28,7 @@
 
         <div class="btn-group btn-group-justified repo-state-toggle" role="group" >
             <a href="#" id="needsreview" class="btn btn-primary">Needs Review</a>
-            <a href="#" id="workinprogress" class="btn btn-default">Work in progress</a>
+            <a href="#" id="readytoland" class="btn btn-default">Ready to land</a>
             <a href="#" id="reset" class="btn btn-default">All</a>
         </div>
 
@@ -37,8 +37,8 @@
             <tr>
                 <th>Repo</th>
                 <th>Merge Proposal</th>
+                <th>Author</th>
                 <th>State</th>
-                <th>Owner</th>
                 <th>Latest Activity</th>
                 <th>Age</th>
                 <th>Reviews</th>
@@ -50,8 +50,8 @@
                 <tr data-state="{{ pull_request.state|lower }}">
                     <td data-order="{{ repo.repo_name }}" title="{{ repo.repo_name }}"><a href="{{ repo.repo_url }}">{{ repo.repo_shortname }}</a></td>
                     <td><a href="{{ pull_request.url }}">{{ pull_request.title }}</a></td>
-                    <td>{{ pull_request.state }}</td>
                     <td>{{ pull_request.owner }}</td>
+                    <td>{{ pull_request.state }}</td>
                     <td data-order="{{ pull_request.latest_activity }}">{{ pull_request.latest_activity_age }}</td>
                     <td data-order="{{ pull_request.date }}">{{ pull_request.age }}</td>
                     <td>
@@ -86,39 +86,41 @@
              paging: false,
              order: [[ 4, "desc" ]]
         });
-        function show_row_with_states(states){
+        function show_row_with_states(state){
             $.fn.dataTable.ext.search.pop();
             repo_data_table.draw();
             $.fn.dataTable.ext.search.push(
                function(settings, data, dataIndex) {
-                  return states.indexOf($(repo_data_table.row(dataIndex).node()).attr('data-state')) !== -1;
+                   // The data is returned in all-lowercased text here. ~chrisglass
+                   var row_contents = $(repo_data_table.row(dataIndex).node()).attr('data-state');
+                   return row_contents.indexOf(state) !== -1;
                }
             );
             repo_data_table.draw();
         }
-        $("#workinprogress").click(function(event) {
+        $("#readytoland").click(function(event) {
             event.preventDefault();
             $(this).addClass('btn-primary').removeClass('btn-default');
             $('#needsreview').removeClass('btn-primary').addClass('btn-default');
             $('#reset').removeClass('btn-primary').addClass('btn-default');
-            show_row_with_states(["work in progress"]);
+            show_row_with_states("ready to land");
         });
 
         $("#needsreview").click(function(event) {
             event.preventDefault();
             $(this).addClass('btn-primary').removeClass('btn-default');
             $('#reset').removeClass('btn-primary').addClass('btn-default');
-            $('#workinprogress').removeClass('btn-primary').addClass('btn-default');
-            show_row_with_states(["needs review", "open"]);
+            $('#readytoland').removeClass('btn-primary').addClass('btn-default');
+            show_row_with_states("open");
         });
 
-        show_row_with_states(["needs review", "open"]);
+        show_row_with_states("open");
 
         $("#reset").click(function(event) {
             event.preventDefault();
             $(this).addClass('btn-primary').removeClass('btn-default');
             $('#needsreview').removeClass('btn-primary').addClass('btn-default');
-            $('#workinprogress').removeClass('btn-primary').addClass('btn-default');
+            $('#readytoland').removeClass('btn-primary').addClass('btn-default');
             $.fn.dataTable.ext.search.pop();
             repo_data_table.draw();
         });

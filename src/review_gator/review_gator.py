@@ -201,7 +201,8 @@ def get_prs(gr, repo, review_count):
     pull_requests = []
     pulls = repo.get_pulls()
     for p in pulls:
-        pr = GithubPullRequest(p, p.html_url, p.title, p.head.repo.owner.login,
+        submitter = p.user.login
+        pr = GithubPullRequest(p, p.html_url, p.title, submitter,
                             p.state, p.created_at, review_count)
         gr.add(pr)
         pull_requests.append(pr)
@@ -227,11 +228,19 @@ def get_prs(gr, repo, review_count):
                             pr_latest_activity:
                 pr_latest_activity = pytz.utc.localize(raw_comment.created_at)
 
+        approvals = 0
         for raw_review in raw_reviews:
-            owner = raw_review.user.login
-            review = GithubReview(raw_review, raw_review.html_url, owner,
+            reviewer = raw_review.user.login
+            review = GithubReview(raw_review, raw_review.html_url, reviewer,
                                   raw_review.state, raw_review.submitted_at)
-            pr.add_review(review)
+
+            if reviewer != submitter:
+                # We ignore reviews/comments made by the owner of a PR.
+                # Note: pr_latest_activity will still count the submiter's
+                # comments, but won't display their review.
+                pr.add_review(review)
+                if review.state == "APPROVED":
+                    approvals = approvals + 1
 
             # Review might be more recent than a comment
             if pr_latest_activity is None or \
@@ -240,6 +249,11 @@ def get_prs(gr, repo, review_count):
                     pr_latest_activity:
                 pr_latest_activity = pytz.utc.localize(
                         raw_review.submitted_at)
+
+        if approvals < review_count:
+            pr.state = "Open (%s/%s approvals)" % (approvals, review_count)
+        else:
+            pr.state = "Ready to land (%s/%s approvals)" % (approvals, review_count)
 
         pr.latest_activity = pr_latest_activity
 
