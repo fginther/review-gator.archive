@@ -91,7 +91,9 @@ class PullRequest(object):
     @property
     def latest_activity_age(self):
         # print(u'{}'.format(self))
-        return date_to_age(self.latest_activity)
+        if self.latest_activity is not None:
+            return date_to_age(self.latest_activity)
+        return self.age
 
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
