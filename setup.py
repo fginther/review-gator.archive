@@ -3,7 +3,10 @@ from setuptools import find_packages, setup
 from glob import glob
 from os.path import basename
 from os.path import splitext
-from pip.req import parse_requirements
+try: # for pip >= 10
+    from pip._internal.req import parse_requirements
+except ImportError: # for pip <= 9.0.3
+    from pip.req import parse_requirements
 
 reqs_path = os.path.join(os.path.dirname(__file__), 'src/requirements.txt')
 
