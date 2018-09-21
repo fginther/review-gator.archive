@@ -16,7 +16,6 @@ from babel.dates import format_datetime
 from jinja2 import Environment, FileSystemLoader
 from pkg_resources import resource_filename
 
-from . import launchpadagent
 from . import clicklib
 
 MAX_DESCRIPTION_LENGTH = 80
@@ -419,6 +418,8 @@ def get_branches(sources):
 
 def get_lp_repos(sources):
     '''Return all repos, prs and reviews for the given lp-git source.'''
+    # deferred import of launchpadagent until required
+    from . import launchpadagent
     cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
@@ -467,6 +468,8 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
         if 'lp-git' in sources:
             repos.extend(get_lp_repos(sources['lp-git']))
         if 'launchpad' in sources:
+            # install time dependency on launchpad libs.
+            from . import launchpadagent
             repos.extend(get_branches(sources['launchpad']))
         if 'github' in sources:
             repos.extend(get_repos(sources['github'],
