@@ -329,7 +329,7 @@ def get_mp_title(mp):
 
 def get_candidate_mps(branch):
     try:
-        mps = branch.getMergeProposals(status='Needs review')
+        mps = branch.getMergeProposals(status=['Needs review','Work in progress'])
     except AttributeError:
         mps = branch.landing_candidates
     return mps
