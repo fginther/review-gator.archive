@@ -397,6 +397,8 @@ def get_branches(sources):
     '''Return all repos, prs and reviews for the given launchpad sources.'''
     cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
+    # deferred import of launchpadagent until required
+    from . import launchpadagent
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
     repos = []
     for source, data in sources['branches'].items():
