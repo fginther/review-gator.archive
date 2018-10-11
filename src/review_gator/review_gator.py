@@ -229,6 +229,8 @@ def get_prs(gr, repo, review_count):
                 pr_latest_activity = pytz.utc.localize(raw_comment.created_at)
 
         for raw_review in raw_reviews:
+            if raw_review.state == 'PENDING':
+                continue
             owner = raw_review.user.login
             review = GithubReview(raw_review, raw_review.html_url, owner,
                                   raw_review.state, raw_review.submitted_at)
