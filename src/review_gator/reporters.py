@@ -42,7 +42,7 @@ class InfluxDBTotalAgeReporter(ReviewGatorReporter):
         class ReviewAgeSeries(SeriesHelper):
 
             class Meta(object):
-                series_name = 'review_gator.total_review_age'
+                series_name = os.environ['REVIEW_GATOR_METRIC_NAME']
                 fields = ['total_age']
                 tags = []  # type: List[Text]
 
@@ -77,7 +77,7 @@ class InfluxDBTotalAgeReporter(ReviewGatorReporter):
         for arg in cls.influxdb_args:
             if 'INFLUXDB_{}'.format(arg.upper()) not in os.environ:
                 return False
-        return True
+        return 'REVIEW_GATOR_METRIC_NAME' in os.environ
 
 
 REPORTER_CLASSES = [InfluxDBTotalAgeReporter]
