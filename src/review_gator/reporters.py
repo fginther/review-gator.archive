@@ -74,9 +74,6 @@ class InfluxDBTotalAgeReporter(ReviewGatorReporter):
             import influxdb
         except ImportError:
             return False
-        for arg in cls.influxdb_args:
-            if 'INFLUXDB_{}'.format(arg.upper()) not in os.environ:
-                return False
         return 'REVIEW_GATOR_METRIC_NAME' in os.environ
 
 
