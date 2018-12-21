@@ -17,6 +17,7 @@ from jinja2 import Environment, FileSystemLoader
 from pkg_resources import resource_filename
 
 from . import clicklib
+from .reporters import REPORTER_CLASSES
 
 MAX_DESCRIPTION_LENGTH = 80
 NOW = pytz.utc.localize(datetime.datetime.utcnow())
@@ -270,9 +271,16 @@ def get_repo_data(repos):
     return repo_data
 
 
+def report_repo_data(data):
+    for reporter_cls in REPORTER_CLASSES:
+        if reporter_cls.enabled():
+            reporter_cls().process_data(data)
+
+
 def render(repos, output_directory):
     '''Render the repositories into an html file.'''
     data = get_repo_data(repos)
+    report_repo_data(data)
     abs_templates_path = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(abs_templates_path))
