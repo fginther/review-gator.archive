@@ -42,15 +42,14 @@ class InfluxDBTotalAgeReporter(ReviewGatorReporter):
     * INFLUXDB_DATABASE
     """
 
-    influxdb_args = ['host', 'port', 'username', 'password', 'database']
-
     def __init__(self):  # type: () -> None
         self.now = pytz.utc.localize(datetime.datetime.utcnow())
 
         from influxdb import InfluxDBClient, SeriesHelper
         # Construct tuples for dict creation
+        influxdb_args = ['host', 'port', 'username', 'password', 'database']
         client_tuples = [(k, os.environ.get('INFLUXDB_{}'.format(k.upper())))
-                         for k in self.influxdb_args]
+                         for k in influxdb_args]
         # Strip out any unset environment variables so the InfluxDB defaults
         # are used
         client_kwargs = {k: v for k,v in client_tuples if v is not None}
