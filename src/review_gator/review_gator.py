@@ -213,34 +213,29 @@ def get_prs(gr, repo, review_count):
 
         # Find most recent issue comment activity on pull request
         for raw_issue_comment in raw_issue_comments:
-            if pr_latest_activity is None or \
-                            pytz.utc.localize(
-                                    raw_issue_comment.created_at) > \
-                            pr_latest_activity:
-                pr_latest_activity = pytz.utc.localize(
-                        raw_issue_comment.created_at)
+            issue_comment_created_at = pytz.utc.localize(
+                raw_issue_comment.created_at)
+            if pr_latest_activity is None or (
+                    issue_comment_created_at > pr_latest_activity):
+                pr_latest_activity = issue_comment_created_at
 
         # Find most recent comment activity on pull request
         for raw_comment in raw_comments:
-            if pr_latest_activity is None or \
-                            pytz.utc.localize(
-                                    raw_comment.created_at) > \
-                            pr_latest_activity:
-                pr_latest_activity = pytz.utc.localize(raw_comment.created_at)
+            comment_created_at = pytz.utc.localize(
+                raw_comment.created_at)
+            if pr_latest_activity is None or (
+                    comment_created_at > pr_latest_activity):
+                pr_latest_activity = comment_created_at
 
         for raw_review in raw_reviews:
             owner = raw_review.user.login
             review = GithubReview(raw_review, raw_review.html_url, owner,
                                   raw_review.state, raw_review.submitted_at)
             pr.add_review(review)
-
+            review_date = pytz.utc.localize(raw_review.submitted_at)
             # Review might be more recent than a comment
-            if pr_latest_activity is None or \
-                    pytz.utc.localize(
-                            raw_review.submitted_at) > \
-                    pr_latest_activity:
-                pr_latest_activity = pytz.utc.localize(
-                        raw_review.submitted_at)
+            if pr_latest_activity is None or review_date > pr_latest_activity:
+                pr_latest_activity = review_date
 
         pr.latest_activity = pr_latest_activity
 
@@ -395,6 +390,8 @@ def get_branches_for_owner(lp, collected, owner, max_age):
 
 def get_branches(sources):
     '''Return all repos, prs and reviews for the given launchpad sources.'''
+    # deferred import of launchpadagent until required
+    from . import launchpadagent
     cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
