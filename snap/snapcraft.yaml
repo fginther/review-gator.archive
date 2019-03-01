@@ -23,9 +23,10 @@ apps:
 parts:
   review-gator-wrapper:
     plugin: dump
-    source: snap
-    prepare: |
+    source: snap/local
+    override-build: |
       chmod +x wrapper
+      snapcraftctl build
     stage:
       - usr/bin/wrapper
     organize:
