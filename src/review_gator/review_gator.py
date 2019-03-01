@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import shutil
 import socket
 import sys
 import time
@@ -275,6 +276,8 @@ def render(repos, output_directory):
     data = get_repo_data(repos)
     abs_templates_path = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "templates")
+    abs_vendor_path = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)), "vendor")
     env = Environment(loader=FileSystemLoader(abs_templates_path))
     tmpl = env.get_template('reviews.html')
 
@@ -286,6 +289,10 @@ def render(repos, output_directory):
         out_file.write(tmpl.render(context))
         print("**** {} written ****".format(output_html_filepath))
         print("file://{}".format(output_html_filepath))
+    output_vendor_dir = os.path.join(output_directory, 'vendor')
+    shutil.rmtree(output_vendor_dir, True)
+    # Copy the vendored CSS and JS
+    shutil.copytree(abs_vendor_path, output_vendor_dir)
 
 
 def get_mp_title(mp):
