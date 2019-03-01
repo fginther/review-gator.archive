@@ -1,5 +1,6 @@
 name: review-gator
 version: '0.2'
+base: core18
 summary: Helpful utility to render merge proposals as HTML
 description: |
   Helpful utility to render merge proposals from launchpad and pull
