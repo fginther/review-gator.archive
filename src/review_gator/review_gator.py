@@ -341,7 +341,7 @@ def get_mp_title(mp):
 
 def get_candidate_mps(branch):
     try:
-        mps = branch.getMergeProposals(status='Needs review')
+        mps = branch.getMergeProposals(status=['Needs review','Work in progress'])
     except AttributeError:
         mps = branch.landing_candidates
     return mps
@@ -411,6 +411,8 @@ def get_branches(sources):
     from . import launchpadagent
     cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
+    # deferred import of launchpadagent until required
+    from . import launchpadagent
     lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
     repos = []
     for source, data in sources['branches'].items():
