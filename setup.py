@@ -19,7 +19,7 @@ reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='review-gator',
-    version='0.1',
+    version='0.2',
     install_requires=reqs,
     url='',
     license='',

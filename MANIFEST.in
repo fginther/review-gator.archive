@@ -1,5 +1,6 @@
 graft src/review_gator
 graft src/review_gator/templates
+graft src/review_gator/vendor
 
 include MANIFEST.in
 

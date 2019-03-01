@@ -1,5 +1,6 @@
 name: review-gator
 version: '0.2'
+base: core18
 summary: Helpful utility to render merge proposals as HTML
 description: |
   Helpful utility to render merge proposals from launchpad and pull
@@ -23,9 +24,10 @@ apps:
 parts:
   review-gator-wrapper:
     plugin: dump
-    source: snap
-    prepare: |
+    source: snap/local
+    override-build: |
       chmod +x wrapper
+      snapcraftctl build
     stage:
       - usr/bin/wrapper
     organize:
