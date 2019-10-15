@@ -6,3 +6,5 @@ pytz
 PyYAML
 python-jose
 PyGithub
+lpshipit
+joblib

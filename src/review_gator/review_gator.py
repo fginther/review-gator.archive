@@ -15,8 +15,12 @@ import yaml
 
 from babel.dates import format_datetime
 from jinja2 import Environment, FileSystemLoader
+from joblib import Parallel, delayed
+
+from lpshipit import _format_git_branch_name
 from pkg_resources import resource_filename
 
+from . import tox_runner
 from . import clicklib
 from .reporters import REPORTER_CLASSES
 
@@ -36,6 +40,8 @@ class Repo(object):
         self.url = url
         self.name = name
         self.pull_requests = []
+        self.pull_requests_requiring_tox = []
+        self.tox = False
 
     def __repr__(self):
         return 'Repo[{}, {}, {}, {}]'.format(
@@ -45,9 +51,17 @@ class Repo(object):
     def pull_request_count(self):
         return len(self.pull_requests)
 
+    @property
+    def pull_request_requiring_tox_count(self):
+        return len(self.pull_requests_requiring_tox)
+
     def add(self, pull_request):
         '''Add a pull request to this repository.'''
         self.pull_requests.append(pull_request)
+
+    def add_requiring_tox(self, pull_request_requiring_tox):
+        '''Add a pull request that requires tox to this repository.'''
+        self.pull_requests_requiring_tox.append(pull_request_requiring_tox)
 
 
 class GithubRepo(Repo):
@@ -95,6 +109,10 @@ class PullRequest(object):
         if self.latest_activity is not None:
             return date_to_age(self.latest_activity)
         return self.age
+
+    @property
+    def mp_id(self):
+        return self.url.split('/')[-1]
 
     def add_review(self, review):
         '''Adds a review, replacing any older review by the same owner.'''
@@ -252,6 +270,7 @@ def get_pr_data(pull_requests):
     for p in pull_requests:
         pr_data.append(merge_two_dicts(p.__dict__, {
             'age': p.age,
+            'id': p.mp_id,
             'latest_activity_age': p.latest_activity_age}))
     return pr_data
 
@@ -263,6 +282,7 @@ def get_repo_data(repos):
         repo_data[repo.name] = {
             'repo_url': repo.url,
             'repo_name': repo.name,
+            'tox': repo.tox,
             'repo_shortname': repo.name.split('/')[-1],
             'pull_requests': get_pr_data(repo.pull_requests)
         }
@@ -275,7 +295,7 @@ def report_repo_data(data):
             reporter_cls().process_data(data)
 
 
-def render(repos, output_directory):
+def render(repos, output_directory, tox):
     '''Render the repositories into an html file.'''
     data = get_repo_data(repos)
     report_repo_data(data)
@@ -290,7 +310,7 @@ def render(repos, output_directory):
     os.makedirs(output_directory, exist_ok=True)
     output_html_filepath = os.path.join(output_directory, 'reviews.html')
     with open(output_html_filepath, 'w') as out_file:
-        context = {'repos': data, 'generation_time': NOW}
+        context = {'repos': data, 'generation_time': NOW, 'tox': tox}
         out_file.write(tmpl.render(context))
         print("**** {} written ****".format(output_html_filepath))
         print("file://{}".format(output_html_filepath))
@@ -347,9 +367,10 @@ def get_candidate_mps(branch):
     return mps
 
 
-def get_mps(repo, branch):
+def get_mps(repo, branch, output_directory=None):
     '''Return all merge proposals for the given branch.'''
     mps = get_candidate_mps(branch)
+    tox_mps = []
     for mp in mps:
         _, owner = mp.registrant_link.split('~')
         title = get_mp_title(mp)
@@ -359,6 +380,9 @@ def get_mps(repo, branch):
                                   mp.date_created, 2)
         repo.add(pr)
         mp_latest_activity = None
+
+        if repo.tox and pr.state == 'Needs review':
+            repo.add_requiring_tox(mp)
 
         # Find most recent activity on merge proposal
         for mp_comment in mp.all_comments:
@@ -432,7 +456,7 @@ def get_branches(sources):
     return repos
 
 
-def get_lp_repos(sources):
+def get_lp_repos(sources, output_directory=None):
     '''Return all repos, prs and reviews for the given lp-git source.'''
     # deferred import of launchpadagent until required
     from . import launchpadagent
@@ -444,7 +468,8 @@ def get_lp_repos(sources):
         print(source, data)
         b = lp.git_repositories.getByPath(path=source.replace('lp:', ''))
         repo = LaunchpadRepo(b, b.web_link, b.display_name)
-        get_mps(repo, b)
+        repo.tox = data.get('tox', False)
+        get_mps(repo, b, output_directory)
         if repo.pull_request_count > 0:
             repos.append(repo)
         print(repo)
@@ -478,11 +503,11 @@ def get_sources(source):
 
 
 def aggregate_reviews(sources, output_directory, github_password, github_token,
-                      github_username):
+                      github_username, tox):
     try:
         repos = []
         if 'lp-git' in sources:
-            repos.extend(get_lp_repos(sources['lp-git']))
+            repos.extend(get_lp_repos(sources['lp-git'], output_directory))
         if 'launchpad' in sources:
             # install time dependency on launchpad libs.
             from . import launchpadagent
@@ -490,7 +515,39 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
         if 'github' in sources:
             repos.extend(get_repos(sources['github'],
                                    github_username, github_password, github_token))
-        render(repos, output_directory)
+        # Should we be running tox on any pull requests?
+        if tox:
+            tox_mps = []
+            # Are there any repos with any pull requests requiring a tox run?
+            for repo in repos:
+                if getattr(repo, 'pull_request_requiring_tox_count', 0) > 0:
+                    tox_mps.extend(repo.pull_requests_requiring_tox)
+
+            # For all pull requests requiring a tox run set the initial state
+            # as running, then render the report as normal.
+            for tox_mp in tox_mps:
+                parallel_tox = Parallel(n_jobs=-1)(
+                    delayed(tox_runner.prep_tox_state)(
+                        output_directory,
+                        tox_mp.web_link.split('/')[-1])
+                    for tox_mp in tox_mps
+                )
+
+        # Render the report
+        render(repos, output_directory, tox)
+
+        if tox:
+            # Once report is rendered with initial state then we can start
+            # running the tox tests and update state after each run
+            parallel_tox = Parallel(n_jobs=-1)(
+                delayed(tox_runner.run_tox)(
+                    tox_mp.source_git_repository.display_name,
+                    _format_git_branch_name(tox_mp.source_git_path),
+                    output_directory,
+                    tox_mp.web_link.split('/')[-1])
+                for tox_mp in tox_mps
+            )
+
         last_poll = format_datetime(pytz.utc.localize(datetime.datetime.utcnow()))
         print("Last run @ {}".format(last_poll))
     except socket.timeout as se:
@@ -537,11 +594,15 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
                    "variable.", default=None)
 @click.option('--poll', is_flag=True, default=False,
               help='Keep aggregating reviews at a specified interval')
+@click.option('--tox', is_flag=True, default=False,
+              help='If repo config "tox: true" run tox and show result '
+                   'as graphic')
 @click.option('--poll-interval', type=int, required=False, default=600,
               help="Interval, in seconds, between each version check "
                    "[default: 600 seconds]")
 def main(config_skeleton, config, output_directory,
-         github_username, github_password, github_token, poll, poll_interval):
+         github_username, github_password, github_token, poll,
+         tox, poll_interval):
     """Start here."""
     global NOW
     if config_skeleton:
@@ -556,7 +617,7 @@ def main(config_skeleton, config, output_directory,
 
     sources = get_sources(config)
     aggregate_reviews(sources, output_directory, github_password,
-                      github_token, github_username)
+                      github_token, github_username, tox)
 
     if poll:
         # We do use time.sleep which is blocking so it is best to 'nice'
@@ -571,7 +632,7 @@ def main(config_skeleton, config, output_directory,
             time.sleep(poll_interval)  # wait before checking again
             NOW = pytz.utc.localize(datetime.datetime.utcnow())
             aggregate_reviews(sources, output_directory, github_password,
-                              github_token, github_username)
+                              github_token, github_username, tox)
 
 
 if __name__ == '__main__':

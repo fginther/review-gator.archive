@@ -42,6 +42,9 @@
                 <th>Latest Activity</th>
                 <th>Age</th>
                 <th>Reviews</th>
+                {% if tox %}
+                    <th>Tox</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -69,6 +72,15 @@
                             </tbody>
                         </table>
                     </td>
+                    {% if tox %}
+                        <td>
+                            {% if repo.tox %}
+                                <img src="{{ pull_request.id }}.svg" title="Tox test state" height="40px" />
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    {% endif %}
                 </tr>
 
             {% endfor %}
