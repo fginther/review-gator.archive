@@ -3,5 +3,7 @@ graft src/review_gator/templates
 graft src/review_gator/vendor
 
 include MANIFEST.in
+include LICENSE
+include README.md
 
 global-exclude *.py[cod] __pycache__ *.so *.dylib .gitignore
