@@ -30,12 +30,13 @@ def run_tox(source_repo, source_branch, output_directory=None, mp_id=None):
         # If there was a git exception it should not exit as run_tox is
         # called as a parallel set of jobs and one job failing should not
         # cause the whole process to exit. Instead print the exception
-        print("** There was an exception running git commands **")
+        print("** There was an exception running git commands for repo "
+              "{} branch {} **".format(source_repo, source_branch))
         print(git_exc)
         tox_return_code = 1
     if tox_return_code == 0:
-        print("PASS")
+        print("PASS for repo {} branch {}".format(source_repo, source_branch))
         shutil.copy(success_svg, tox_state)
     else:
-        print("FAIL")
+        print("FAIL for repo {} branch {}".format(source_repo, source_branch))
         shutil.copy(error_svg, tox_state)
