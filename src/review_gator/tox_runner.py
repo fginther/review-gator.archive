@@ -3,6 +3,7 @@
 import os
 import shutil
 
+import git
 from lpmptox import runtox as lpmptox_runtox
 
 
@@ -23,10 +24,17 @@ def run_tox(source_repo, source_branch, output_directory=None, mp_id=None):
     error_svg = os.path.join(abs_vendor_path, "error.svg")
     success_svg = os.path.join(abs_vendor_path, "success.svg")
     shutil.copy(clock_svg, tox_state)
-    tox_return_code = lpmptox_runtox(source_repo, source_branch)
+    try:
+        tox_return_code = lpmptox_runtox(source_repo, source_branch)
+    except git.exc.GitCommandError as git_exc:
+        # If there was a git exception it should not exit as run_tox is
+        # called as a parallel set of jobs and one job failing should not
+        # cause the whole process to exit. Instead print the exception
+        print("** There was an exception running git commands **")
+        print(git_exc)
+        tox_return_code = 1
     if tox_return_code == 0:
         print("PASS")
-        #if not os.path.isfile(tox_state):
         shutil.copy(success_svg, tox_state)
     else:
         print("FAIL")

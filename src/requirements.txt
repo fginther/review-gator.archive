@@ -8,3 +8,4 @@ python-jose
 PyGithub
 lpshipit
 joblib
+GitPython
