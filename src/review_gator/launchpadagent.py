@@ -53,13 +53,17 @@ class AuthorizeRequestTokenWithConsole(RequestTokenAuthorizationEngine):
                     raise e
 
 
-def get_launchpad(launchpadlib_dir=None):
+def get_launchpad(launchpadlib_dir=None, lp_credentials_store=None):
     """ return a launchpad API class. In case launchpadlib_dir is
     specified used that directory to store launchpadlib cache instead of
     the default """
-    creds_prefix = os.environ.get('SNAP_USER_COMMON', os.path.expanduser('~'))
-    store = UnencryptedFileCredentialStore(
-            os.path.join(creds_prefix, '.launchpad.credentials'))
+    if not lp_credentials_store:
+        creds_prefix = os.environ.get('SNAP_USER_COMMON',
+                                      os.path.expanduser('~'))
+        store = UnencryptedFileCredentialStore(
+                os.path.join(creds_prefix, '.launchpad.credentials'))
+    else:
+        store = UnencryptedFileCredentialStore(lp_credentials_store)
     lp_app = 'review-gator'
     lp_env = 'production'
     lp_version = 'devel'
