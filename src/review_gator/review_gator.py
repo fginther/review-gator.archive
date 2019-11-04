@@ -429,7 +429,7 @@ def get_branches_for_owner(lp, collected, owner, max_age):
     return repos
 
 
-def get_branches(sources):
+def get_branches(sources, lp_credentials_store=None):
     '''Return all repos, prs and reviews for the given launchpad sources.'''
     # deferred import of launchpadagent until required
     from . import launchpadagent
@@ -437,7 +437,9 @@ def get_branches(sources):
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
     # deferred import of launchpadagent until required
     from . import launchpadagent
-    lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
+    lp = launchpadagent.get_launchpad(
+        launchpadlib_dir=launchpad_cachedir,
+        lp_credentials_store=lp_credentials_store)
     repos = []
     for source, data in sources['branches'].items():
         print(source, data)
@@ -456,13 +458,15 @@ def get_branches(sources):
     return repos
 
 
-def get_lp_repos(sources, output_directory=None):
+def get_lp_repos(sources, output_directory=None, lp_credentials_store=None):
     '''Return all repos, prs and reviews for the given lp-git source.'''
     # deferred import of launchpadagent until required
     from . import launchpadagent
     cachedir_prefix = os.environ.get('SNAP_USER_COMMON', "/tmp")
     launchpad_cachedir = os.path.join('{}/get_reviews/.launchpadlib'.format(cachedir_prefix))
-    lp = launchpadagent.get_launchpad(launchpadlib_dir=launchpad_cachedir)
+    lp = launchpadagent.get_launchpad(
+        launchpadlib_dir=launchpad_cachedir,
+        lp_credentials_store=lp_credentials_store)
     repos = []
     for source, data in sources['repos'].items():
         print(source, data)
@@ -503,15 +507,17 @@ def get_sources(source):
 
 
 def aggregate_reviews(sources, output_directory, github_password, github_token,
-                      github_username, tox):
+                      github_username, tox, lp_credentials_store):
     try:
         repos = []
         if 'lp-git' in sources:
-            repos.extend(get_lp_repos(sources['lp-git'], output_directory))
+            repos.extend(get_lp_repos(sources['lp-git'], output_directory,
+                                      lp_credentials_store))
         if 'launchpad' in sources:
             # install time dependency on launchpad libs.
             from . import launchpadagent
-            repos.extend(get_branches(sources['launchpad']))
+            repos.extend(get_branches(sources['launchpad'],
+                                      lp_credentials_store))
         if 'github' in sources:
             repos.extend(get_repos(sources['github'],
                                    github_username, github_password, github_token))
@@ -600,9 +606,13 @@ def aggregate_reviews(sources, output_directory, github_password, github_token,
 @click.option('--poll-interval', type=int, required=False, default=600,
               help="Interval, in seconds, between each version check "
                    "[default: 600 seconds]")
+@click.option('--lp-credentials-store', envvar='LP_CREDENTIALS_STORE',
+              required=False,
+              help="An optional path to an already configured launchpad "
+                   "credentials store.", default=None)
 def main(config_skeleton, config, output_directory,
          github_username, github_password, github_token, poll,
-         tox, poll_interval):
+         tox, poll_interval, lp_credentials_store):
     """Start here."""
     global NOW
     if config_skeleton:
@@ -617,7 +627,7 @@ def main(config_skeleton, config, output_directory,
 
     sources = get_sources(config)
     aggregate_reviews(sources, output_directory, github_password,
-                      github_token, github_username, tox)
+                      github_token, github_username, tox, lp_credentials_store)
 
     if poll:
         # We do use time.sleep which is blocking so it is best to 'nice'
@@ -632,7 +642,8 @@ def main(config_skeleton, config, output_directory,
             time.sleep(poll_interval)  # wait before checking again
             NOW = pytz.utc.localize(datetime.datetime.utcnow())
             aggregate_reviews(sources, output_directory, github_password,
-                              github_token, github_username, tox)
+                              github_token, github_username, tox,
+                              lp_credentials_store)
 
 
 if __name__ == '__main__':
